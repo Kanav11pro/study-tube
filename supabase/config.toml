@@ -1,1 +1,7 @@
 project_id = "kelgdjvmsgakdvhfzxrk"
+
+[functions.import-playlist]
+verify_jwt = true
+
+[functions.generate-notes]
+verify_jwt = true

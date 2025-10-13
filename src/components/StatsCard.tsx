@@ -7,7 +7,7 @@ interface StatsCardProps {
   value: string;
   unit?: string;
   icon: LucideIcon;
-  variant?: "success" | "primary" | "secondary" | "accent";
+  variant?: "success" | "primary" | "secondary" | "accent" | "warning";
 }
 
 export const StatsCard = ({ title, value, unit, icon: Icon, variant = "primary" }: StatsCardProps) => {
@@ -16,6 +16,7 @@ export const StatsCard = ({ title, value, unit, icon: Icon, variant = "primary" 
     primary: "bg-primary/10 text-primary",
     secondary: "bg-secondary/10 text-secondary",
     accent: "bg-accent/10 text-accent",
+    warning: "bg-warning/10 text-warning",
   };
 
   return (
