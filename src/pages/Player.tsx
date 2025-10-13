@@ -1,8 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { 
@@ -12,12 +11,12 @@ import {
   Sparkles,
   Play,
   BarChart3,
-  Maximize2,
-  Minimize2,
   Search,
-  X,
-  Keyboard,
-  Pause
+  ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  Maximize,
+  Clock
 } from "lucide-react";
 import { toast } from "sonner";
 import { GenerateNotesDialog } from "@/components/GenerateNotesDialog";
@@ -31,46 +30,39 @@ const Player = () => {
   const [progress, setProgress] = useState<any[]>([]);
   const [showNotesDialog, setShowNotesDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [theaterMode, setTheaterMode] = useState(false);
-  const [focusMode, setFocusMode] = useState(false);
-  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState("");
+  const [autoPlay, setAutoPlay] = useState(true);
 
   useEffect(() => {
     if (!playlistId) return;
     loadPlaylistData();
   }, [playlistId]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts - ENHANCED
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return;
 
       switch(e.key.toLowerCase()) {
         case 'n':
-          if (!e.ctrlKey && !e.metaKey) handleNext();
+          handleNext();
           break;
         case 'p':
-          if (!e.ctrlKey && !e.metaKey) handlePrevious();
-          break;
-        case 't':
-          setTheaterMode(!theaterMode);
-          break;
-        case 'f':
-          setFocusMode(!focusMode);
-          break;
-        case '?':
-          setShowKeyboardHelp(!showKeyboardHelp);
+          handlePrevious();
           break;
         case 'm':
           handleMarkComplete();
+          break;
+        case 'a':
+          setAutoPlay(!autoPlay);
+          toast.success(`Auto-play ${!autoPlay ? 'enabled' : 'disabled'}`);
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [currentVideoIndex, videos, theaterMode, focusMode, showKeyboardHelp]);
+  }, [currentVideoIndex, videos, autoPlay]);
 
   const loadPlaylistData = async () => {
     try {
@@ -158,7 +150,7 @@ const Player = () => {
 
       loadPlaylistData();
       toast.success(
-        existingProgress?.is_completed ? "Marked as incomplete" : "Marked as complete"
+        existingProgress?.is_completed ? "Marked as incomplete" : "Marked as complete ✓"
       );
     } catch (error) {
       console.error("Error updating progress:", error);
@@ -169,12 +161,18 @@ const Player = () => {
   const handleNext = () => {
     if (currentVideoIndex < videos.length - 1) {
       setCurrentVideoIndex(currentVideoIndex + 1);
+      toast.success("Next video loaded");
+    } else {
+      toast.info("This is the last video!");
     }
   };
 
   const handlePrevious = () => {
     if (currentVideoIndex > 0) {
       setCurrentVideoIndex(currentVideoIndex - 1);
+      toast.success("Previous video loaded");
+    } else {
+      toast.info("This is the first video!");
     }
   };
 
@@ -191,9 +189,14 @@ const Player = () => {
   };
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    
+    if (hours > 0) {
+      return `${hours}h ${mins}m ${secs}s`;
+    }
+    return `${mins}m ${secs}s`;
   };
 
   const filteredVideos = videos.filter(v => 
@@ -204,7 +207,7 @@ const Player = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-pulse text-center">
-          <div className="text-2xl font-bold text-primary">Loading...</div>
+          <div className="text-2xl font-bold text-primary">Loading playlist...</div>
         </div>
       </div>
     );
@@ -224,248 +227,227 @@ const Player = () => {
   const currentVideo = videos[currentVideoIndex];
   const currentProgress = getVideoProgress(currentVideo.id);
   const completedCount = videos.filter(v => getVideoProgress(v.id).completed).length;
+  const playlistProgress = (completedCount / videos.length) * 100;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col">
-      {/* Header */}
-      <header className="bg-slate-900/80 backdrop-blur-lg border-b border-slate-700">
-        <div className="container mx-auto flex items-center gap-4 px-4 py-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="hover:bg-slate-800">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex-1 min-w-0">
-            <h1 className="font-semibold text-base truncate text-white">{currentVideo.title}</h1>
-            <p className="text-xs text-slate-400">
-              Video {currentVideoIndex + 1} of {videos.length}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTheaterMode(!theaterMode)}
-              title="Theater Mode (T)"
-              className="hover:bg-slate-800"
-            >
-              {theaterMode ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowKeyboardHelp(true)}
-              title="Keyboard Shortcuts (?)"
-              className="hover:bg-slate-800"
-            >
-              <Keyboard className="h-4 w-4" />
-            </Button>
-          </div>
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
+      {/* Minimal Header */}
+      <header className="border-b bg-card px-4 py-2 flex items-center gap-3 flex-shrink-0">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{playlist.title}</p>
+          <p className="text-xs text-muted-foreground">
+            {completedCount} / {videos.length} completed
+          </p>
         </div>
+        <Button
+          variant="default"
+          size="sm"
+          onClick={() => setShowNotesDialog(true)}
+          className="bg-primary"
+        >
+          <Sparkles className="h-4 w-4 mr-2" />
+          AI Notes
+        </Button>
       </header>
 
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* Video Player Section */}
-        <div 
-          className={`flex-1 flex flex-col transition-all duration-300 ${theaterMode ? 'lg:w-[85%]' : ''} ${focusMode ? 'w-full' : ''}`}
-        >
-          <div className="flex-1 flex items-center justify-center p-4 lg:p-6">
-            <div className="w-full max-w-7xl space-y-4">
-              {/* YouTube Player - FIXED! */}
-              <div className="relative aspect-video bg-black rounded-xl overflow-hidden shadow-2xl">
-                <iframe
-                  src={`https://www.youtube.com/embed/${currentVideo.youtube_video_id}?autoplay=1&rel=0&modestbranding=1`}
-                  className="w-full h-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  title={currentVideo.title}
-                />
+      <div className="flex-1 flex overflow-hidden">
+        {/* Video Section */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Video Player - NO PADDING */}
+          <div className="flex-1 bg-black flex items-center justify-center">
+            <div className="w-full h-full max-w-[1800px]">
+              <iframe
+                src={`https://www.youtube.com/embed/${currentVideo.youtube_video_id}?autoplay=${autoPlay ? 1 : 0}&rel=0&modestbranding=1`}
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                title={currentVideo.title}
+              />
+            </div>
+          </div>
+
+          {/* Video Info & Controls - Clean like ThinkTube */}
+          <div className="bg-card border-t p-4 space-y-4">
+            {/* Title & Actions */}
+            <div className="flex items-start gap-4">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-lg font-semibold leading-tight mb-1">
+                  {currentVideo.title}
+                </h1>
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Circle className="h-3 w-3" />
+                    {currentVideo.channel_name || 'Unknown Channel'}
+                  </span>
+                  <a
+                    href={`https://www.youtube.com/watch?v=${currentVideo.youtube_video_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-primary hover:underline"
+                  >
+                    Watch on YouTube
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-wrap gap-3">
+              <div className="flex gap-2">
                 <Button
-                  onClick={() => setShowNotesDialog(true)}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 flex-1 sm:flex-initial"
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Generate AI Notes
-                </Button>
-                
-                <Button
-                  variant={currentProgress.completed ? "default" : "outline"}
+                  variant="outline"
+                  size="sm"
                   onClick={handleMarkComplete}
-                  className="flex-1 sm:flex-initial bg-slate-800 hover:bg-slate-700 border-slate-600"
                 >
                   {currentProgress.completed ? (
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-1 text-green-600" />
+                      Watched
+                    </>
                   ) : (
-                    <Circle className="h-4 w-4 mr-2" />
+                    <>
+                      <Circle className="h-4 w-4 mr-1" />
+                      Mark Watched
+                    </>
                   )}
-                  {currentProgress.completed ? "Completed" : "Mark Complete"}
                 </Button>
 
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={() => navigate(`/analytics/${playlistId}`)}
-                  className="flex-1 sm:flex-initial bg-slate-800 hover:bg-slate-700 border-slate-600"
                 >
-                  <BarChart3 className="h-4 w-4 mr-2" />
+                  <BarChart3 className="h-4 w-4 mr-1" />
                   Analytics
                 </Button>
-
-                <Button
-                  variant="outline"
-                  onClick={() => setFocusMode(!focusMode)}
-                  className="flex-1 sm:flex-initial bg-slate-800 hover:bg-slate-700 border-slate-600"
-                  title="Focus Mode (F)"
-                >
-                  {focusMode ? "Exit Focus" : "Focus Mode"}
-                </Button>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Playlist Sidebar */}
-        {!focusMode && (
-          <div 
-            className={`${theaterMode ? 'lg:w-[400px]' : 'lg:w-96'} w-full border-t lg:border-t-0 lg:border-l border-slate-700 bg-slate-900/95 backdrop-blur-lg flex flex-col transition-all duration-300`}
-          >
-            {/* Sidebar Header */}
-            <div className="p-4 border-b border-slate-700 space-y-3 sticky top-0 z-10 bg-slate-900/95 backdrop-blur-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <h2 className="font-semibold truncate text-white">{playlist.title}</h2>
-                  <p className="text-sm text-slate-400">
-                    {completedCount} / {videos.length} completed
-                  </p>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={() => setFocusMode(true)}
-                  className="lg:hidden hover:bg-slate-800"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+            {/* Progress Bar */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Playlist Progress</span>
+                <span className="font-medium">{Math.round(playlistProgress)}%</span>
               </div>
-
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Search videos..."
-                  value={sidebarSearch}
-                  onChange={(e) => setSidebarSearch(e.target.value)}
-                  className="pl-9 h-9 bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
-                />
-              </div>
-
-              <Progress value={(completedCount / videos.length) * 100} className="h-2 bg-slate-800" />
+              <Progress value={playlistProgress} className="h-2" />
             </div>
 
-            {/* Video List */}
-            <div className="flex-1 overflow-y-auto">
-              {filteredVideos.map((video, index) => {
-                const videoProgress = getVideoProgress(video.id);
-                const isActive = video.id === currentVideo.id;
-
-                return (
-                  <button
-                    key={video.id}
-                    onClick={() => setCurrentVideoIndex(videos.findIndex(v => v.id === video.id))}
-                    className={`w-full p-3 flex gap-3 hover:bg-slate-800/50 transition-all duration-200 border-b border-slate-800 ${
-                      isActive ? 'bg-blue-900/30 border-l-4 border-l-blue-500' : ''
-                    }`}
-                  >
-                    <div className="relative flex-shrink-0">
-                      <img
-                        src={video.thumbnail_url}
-                        alt={video.title}
-                        className="w-32 h-20 object-cover rounded shadow-lg"
-                      />
-                      {isActive && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded">
-                          <Play className="h-8 w-8 text-white fill-white" />
-                        </div>
-                      )}
-                      {!isActive && videoProgress.completed && (
-                        <div className="absolute top-1 right-1 bg-green-500 rounded-full p-1">
-                          <CheckCircle2 className="h-4 w-4 text-white" />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex-1 text-left min-w-0">
-                      <div className="flex items-start gap-2">
-                        <span className="text-xs text-slate-500 font-mono mt-1">
-                          #{index + 1}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium line-clamp-2 ${isActive ? 'text-blue-400' : 'text-white'}`}>
-                            {video.title}
-                          </p>
-                          <p className="text-xs text-slate-400 mt-1">
-                            {formatTime(video.duration_seconds)}
-                          </p>
-                        </div>
-                      </div>
-                      {!videoProgress.completed && videoProgress.percentage > 0 && (
-                        <Progress value={videoProgress.percentage} className="h-1 mt-2 bg-slate-800" />
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Keyboard Shortcuts Dialog */}
-      {showKeyboardHelp && (
-        <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowKeyboardHelp(false)}
-        >
-          <div onClick={(e) => e.stopPropagation()}>
-            <Card className="p-6 max-w-md bg-slate-900 border-slate-700">
-              <h3 className="text-xl font-bold mb-4 text-white">Keyboard Shortcuts</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between text-white">
-                  <span className="text-slate-400">N</span>
-                  <span>Next video</span>
-                </div>
-                <div className="flex justify-between text-white">
-                  <span className="text-slate-400">P</span>
-                  <span>Previous video</span>
-                </div>
-                <div className="flex justify-between text-white">
-                  <span className="text-slate-400">M</span>
-                  <span>Mark complete</span>
-                </div>
-                <div className="flex justify-between text-white">
-                  <span className="text-slate-400">T</span>
-                  <span>Theater mode</span>
-                </div>
-                <div className="flex justify-between text-white">
-                  <span className="text-slate-400">F</span>
-                  <span>Focus mode</span>
-                </div>
-                <div className="flex justify-between text-white">
-                  <span className="text-slate-400">?</span>
-                  <span>Show shortcuts</span>
-                </div>
-              </div>
-              <Button 
-                onClick={() => setShowKeyboardHelp(false)} 
-                className="w-full mt-4 bg-blue-600 hover:bg-blue-700"
+            {/* Navigation */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrevious}
+                disabled={currentVideoIndex === 0}
               >
-                Got it!
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
               </Button>
-            </Card>
+              
+              <span className="text-sm text-muted-foreground px-3">
+                Video {currentVideoIndex + 1} of {videos.length}
+              </span>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNext}
+                disabled={currentVideoIndex === videos.length - 1}
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+
+              <div className="flex-1" />
+
+              <Button
+                variant={autoPlay ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setAutoPlay(!autoPlay);
+                  toast.success(`Auto-play ${!autoPlay ? 'enabled' : 'disabled'}`);
+                }}
+              >
+                <Play className="h-4 w-4 mr-1" />
+                Auto-play: {autoPlay ? 'ON' : 'OFF'}
+              </Button>
+            </div>
           </div>
         </div>
-      )}
+
+        {/* Sidebar - Clean & Compact */}
+        <div className="w-80 border-l bg-card flex flex-col overflow-hidden">
+          {/* Search */}
+          <div className="p-3 border-b">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search videos..."
+                value={sidebarSearch}
+                onChange={(e) => setSidebarSearch(e.target.value)}
+                className="pl-9 h-9"
+              />
+            </div>
+          </div>
+
+          {/* Video List */}
+          <div className="flex-1 overflow-y-auto">
+            {filteredVideos.map((video, index) => {
+              const videoProgress = getVideoProgress(video.id);
+              const isActive = video.id === currentVideo.id;
+
+              return (
+                <button
+                  key={video.id}
+                  onClick={() => setCurrentVideoIndex(videos.findIndex(v => v.id === video.id))}
+                  className={`w-full p-3 flex gap-3 hover:bg-muted/50 transition-colors border-b text-left ${
+                    isActive ? 'bg-primary/5 border-l-4 border-l-primary' : ''
+                  }`}
+                >
+                  {/* Thumbnail */}
+                  <div className="relative flex-shrink-0">
+                    <img
+                      src={video.thumbnail_url}
+                      alt={video.title}
+                      className="w-28 h-16 object-cover rounded"
+                    />
+                    {videoProgress.completed && (
+                      <div className="absolute top-1 right-1 bg-green-600 rounded-full p-0.5">
+                        <CheckCircle2 className="h-3 w-3 text-white" />
+                      </div>
+                    )}
+                    {isActive && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded">
+                        <Play className="h-6 w-6 text-white fill-white" />
+                      </div>
+                    )}
+                    <div className="absolute bottom-1 right-1 bg-black/80 text-white text-xs px-1 rounded">
+                      {formatTime(video.duration_seconds)}
+                    </div>
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium line-clamp-2 mb-1 ${isActive ? 'text-primary' : ''}`}>
+                      {video.title}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>#{index + 1}</span>
+                      {videoProgress.percentage > 0 && !videoProgress.completed && (
+                        <span className="text-primary">{Math.round(videoProgress.percentage)}% watched</span>
+                      )}
+                    </div>
+                    {videoProgress.percentage > 0 && !videoProgress.completed && (
+                      <Progress value={videoProgress.percentage} className="h-1 mt-1" />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
 
       <GenerateNotesDialog
         open={showNotesDialog}
