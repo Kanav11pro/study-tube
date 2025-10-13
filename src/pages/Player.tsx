@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { GenerateNotesDialog } from "@/components/GenerateNotesDialog";
-import { motion, AnimatePresence } from "framer-motion";
 
 // YouTube Player API types
 declare global {
@@ -405,11 +404,7 @@ const Player = () => {
   return (
     <div className="min-h-screen bg-black flex flex-col">
       {/* Header */}
-      <motion.header 
-        className="bg-card/95 backdrop-blur border-b"
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-      >
+      <header className="bg-card/95 backdrop-blur border-b animate-in slide-in-from-top duration-300">
         <div className="container mx-auto flex items-center gap-4 px-4 py-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
             <ArrowLeft className="h-5 w-5" />
@@ -439,14 +434,12 @@ const Player = () => {
             </Button>
           </div>
         </div>
-      </motion.header>
+      </header>
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Video Player Section */}
-        <motion.div 
-          className={`flex-1 flex flex-col ${theaterMode ? 'lg:w-[90%]' : ''} ${focusMode ? 'w-full' : ''}`}
-          layout
-          transition={{ duration: 0.3 }}
+        <div 
+          className={`flex-1 flex flex-col transition-all duration-300 ${theaterMode ? 'lg:w-[90%]' : ''} ${focusMode ? 'w-full' : ''}`}
         >
           <div className="flex-1 flex items-center justify-center bg-black p-4 lg:p-6">
             <div className="w-full max-w-7xl space-y-4">
@@ -455,35 +448,28 @@ const Player = () => {
                 <div id="youtube-player" className="w-full h-full" />
                 
                 {/* Resume Prompt */}
-                <AnimatePresence>
-                  {showResumePrompt && (
-                    <motion.div
-                      className="absolute inset-0 bg-black/80 flex items-center justify-center z-50"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                    >
-                      <Card className="p-6 space-y-4 bg-card/95 backdrop-blur">
-                        <h3 className="text-lg font-semibold">Continue watching?</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Resume from {formatTime(resumeTime)}
-                        </p>
-                        <div className="flex gap-3">
-                          <Button onClick={handleResume} className="flex-1">
-                            Resume
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            onClick={() => setShowResumePrompt(false)}
-                            className="flex-1"
-                          >
-                            Start from beginning
-                          </Button>
-                        </div>
-                      </Card>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {showResumePrompt && (
+                  <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 animate-in fade-in duration-300">
+                    <Card className="p-6 space-y-4 bg-card/95 backdrop-blur animate-in zoom-in-95 duration-300">
+                      <h3 className="text-lg font-semibold">Continue watching?</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Resume from {formatTime(resumeTime)}
+                      </p>
+                      <div className="flex gap-3">
+                        <Button onClick={handleResume} className="flex-1">
+                          Resume
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setShowResumePrompt(false)}
+                          className="flex-1"
+                        >
+                          Start from beginning
+                        </Button>
+                      </div>
+                    </Card>
+                  </div>
+                )}
               </div>
 
               {/* Progress Bar */}
@@ -499,12 +485,7 @@ const Player = () => {
               </div>
 
               {/* Action Buttons */}
-              <motion.div 
-                className="flex flex-wrap gap-3"
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.2 }}
-              >
+              <div className="flex flex-wrap gap-3 animate-in slide-in-from-bottom duration-500">
                 <Button
                   onClick={() => setShowNotesDialog(true)}
                   className="bg-gradient-primary flex-1 sm:flex-initial"
@@ -543,182 +524,167 @@ const Player = () => {
                 >
                   {focusMode ? "Exit Focus" : "Focus Mode"}
                 </Button>
-              </motion.div>
+              </div>
             </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* Playlist Sidebar */}
-        <AnimatePresence>
-          {!focusMode && (
-            <motion.div 
-              className={`${theaterMode ? 'lg:w-[400px]' : 'lg:w-96'} w-full border-t lg:border-t-0 lg:border-l bg-card flex flex-col`}
-              initial={{ x: 400, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 400, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              {/* Sidebar Header */}
-              <div className="p-4 border-b space-y-3 bg-card/95 backdrop-blur sticky top-0 z-10">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <h2 className="font-semibold truncate">{playlist.title}</h2>
-                    <p className="text-sm text-muted-foreground">
-                      {completedCount} / {videos.length} completed
-                    </p>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => setFocusMode(true)}
-                    className="lg:hidden"
+        {!focusMode && (
+          <div 
+            className={`${theaterMode ? 'lg:w-[400px]' : 'lg:w-96'} w-full border-t lg:border-t-0 lg:border-l bg-card flex flex-col transition-all duration-300`}
+          >
+            {/* Sidebar Header */}
+            <div className="p-4 border-b space-y-3 bg-card/95 backdrop-blur sticky top-0 z-10">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-semibold truncate">{playlist.title}</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {completedCount} / {videos.length} completed
+                  </p>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => setFocusMode(true)}
+                  className="lg:hidden"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search videos..."
+                  value={sidebarSearch}
+                  onChange={(e) => setSidebarSearch(e.target.value)}
+                  className="pl-9 h-9"
+                />
+              </div>
+
+              <Progress value={(completedCount / videos.length) * 100} className="h-2" />
+            </div>
+
+            {/* Video List */}
+            <div className="flex-1 overflow-y-auto">
+              {filteredVideos.map((video, index) => {
+                const videoProgress = getVideoProgress(video.id);
+                const isActive = video.id === currentVideo.id;
+
+                return (
+                  <button
+                    key={video.id}
+                    onClick={() => setCurrentVideoIndex(videos.findIndex(v => v.id === video.id))}
+                    className={`w-full p-3 flex gap-3 hover:bg-muted/50 transition-all duration-200 border-b ${
+                      isActive ? 'bg-primary/10 border-l-4 border-l-primary' : ''
+                    }`}
                   >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Search */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search videos..."
-                    value={sidebarSearch}
-                    onChange={(e) => setSidebarSearch(e.target.value)}
-                    className="pl-9 h-9"
-                  />
-                </div>
-
-                <Progress value={(completedCount / videos.length) * 100} className="h-2" />
-              </div>
-
-              {/* Video List */}
-              <div className="flex-1 overflow-y-auto">
-                {filteredVideos.map((video, index) => {
-                  const videoProgress = getVideoProgress(video.id);
-                  const isActive = video.id === currentVideo.id;
-
-                  return (
-                    <motion.button
-                      key={video.id}
-                      onClick={() => setCurrentVideoIndex(videos.findIndex(v => v.id === video.id))}
-                      className={`w-full p-3 flex gap-3 hover:bg-muted/50 transition-colors border-b ${
-                        isActive ? 'bg-primary/10 border-l-4 border-l-primary' : ''
-                      }`}
-                      whileHover={{ x: 4 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <div className="relative flex-shrink-0">
-                        <img
-                          src={video.thumbnail_url}
-                          alt={video.title}
-                          className="w-32 h-20 object-cover rounded shadow-md"
-                        />
-                        {isActive && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded">
-                            {isPlaying ? (
-                              <Pause className="h-8 w-8 text-white fill-white" />
-                            ) : (
-                              <Play className="h-8 w-8 text-white fill-white" />
-                            )}
-                          </div>
-                        )}
-                        {!isActive && videoProgress.completed && (
-                          <div className="absolute top-1 right-1 bg-success rounded-full p-1">
-                            <CheckCircle2 className="h-4 w-4 text-white" />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex-1 text-left min-w-0">
-                        <div className="flex items-start gap-2">
-                          <span className="text-xs text-muted-foreground font-mono mt-1">
-                            #{index + 1}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-medium line-clamp-2 ${isActive ? 'text-primary' : ''}`}>
-                              {video.title}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {Math.floor(video.duration_seconds / 60)}:{(video.duration_seconds % 60).toString().padStart(2, '0')}
-                            </p>
-                          </div>
+                    <div className="relative flex-shrink-0">
+                      <img
+                        src={video.thumbnail_url}
+                        alt={video.title}
+                        className="w-32 h-20 object-cover rounded shadow-md"
+                      />
+                      {isActive && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded">
+                          {isPlaying ? (
+                            <Pause className="h-8 w-8 text-white fill-white" />
+                          ) : (
+                            <Play className="h-8 w-8 text-white fill-white" />
+                          )}
                         </div>
-                        {!videoProgress.completed && videoProgress.percentage > 0 && (
-                          <Progress value={videoProgress.percentage} className="h-1 mt-2" />
-                        )}
+                      )}
+                      {!isActive && videoProgress.completed && (
+                        <div className="absolute top-1 right-1 bg-success rounded-full p-1">
+                          <CheckCircle2 className="h-4 w-4 text-white" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 text-left min-w-0">
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs text-muted-foreground font-mono mt-1">
+                          #{index + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium line-clamp-2 ${isActive ? 'text-primary' : ''}`}>
+                            {video.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {Math.floor(video.duration_seconds / 60)}:{(video.duration_seconds % 60).toString().padStart(2, '0')}
+                          </p>
+                        </div>
                       </div>
-                    </motion.button>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                      {!videoProgress.completed && videoProgress.percentage > 0 && (
+                        <Progress value={videoProgress.percentage} className="h-1 mt-2" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Keyboard Shortcuts Dialog */}
-      <AnimatePresence>
-        {showKeyboardHelp && (
-          <motion.div
-            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowKeyboardHelp(false)}
+      {showKeyboardHelp && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
+          onClick={() => setShowKeyboardHelp(false)}
+        >
+          <div
+            className="animate-in zoom-in-95 duration-300"
+            onClick={(e) => e.stopPropagation()}
           >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Card className="p-6 max-w-md">
-                <h3 className="text-xl font-bold mb-4">Keyboard Shortcuts</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Space</span>
-                    <span>Play / Pause</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">N</span>
-                    <span>Next video</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">P</span>
-                    <span>Previous video</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">M</span>
-                    <span>Mark complete</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">T</span>
-                    <span>Theater mode</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">F</span>
-                    <span>Focus mode</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">← →</span>
-                    <span>Seek ±10s</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">?</span>
-                    <span>Show shortcuts</span>
-                  </div>
+            <Card className="p-6 max-w-md">
+              <h3 className="text-xl font-bold mb-4">Keyboard Shortcuts</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Space</span>
+                  <span>Play / Pause</span>
                 </div>
-                <Button 
-                  onClick={() => setShowKeyboardHelp(false)} 
-                  className="w-full mt-4"
-                >
-                  Got it!
-                </Button>
-              </Card>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">N</span>
+                  <span>Next video</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">P</span>
+                  <span>Previous video</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">M</span>
+                  <span>Mark complete</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">T</span>
+                  <span>Theater mode</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">F</span>
+                  <span>Focus mode</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">← →</span>
+                  <span>Seek ±10s</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">?</span>
+                  <span>Show shortcuts</span>
+                </div>
+              </div>
+              <Button 
+                onClick={() => setShowKeyboardHelp(false)} 
+                className="w-full mt-4"
+              >
+                Got it!
+              </Button>
+            </Card>
+          </div>
+        </div>
+      )}
 
       <GenerateNotesDialog
         open={showNotesDialog}
