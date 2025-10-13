@@ -22,18 +22,9 @@ import {
 import { toast } from "sonner";
 import { GenerateNotesDialog } from "@/components/GenerateNotesDialog";
 
-// YouTube Player API types
-declare global {
-  interface Window {
-    YT: any;
-    onYouTubeIframeAPIReady: () => void;
-  }
-}
-
 const Player = () => {
   const { playlistId } = useParams();
   const navigate = useNavigate();
-  const playerRef = useRef<any>(null);
   const [playlist, setPlaylist] = useState<any>(null);
   const [videos, setVideos] = useState<any[]>([]);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
@@ -44,52 +35,15 @@ const Player = () => {
   const [focusMode, setFocusMode] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState("");
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [showResumePrompt, setShowResumePrompt] = useState(false);
-  const [resumeTime, setResumeTime] = useState(0);
-
-  // Load YouTube IFrame API
-  useEffect(() => {
-    if (!window.YT) {
-      const tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      const firstScriptTag = document.getElementsByTagName('script')[0];
-      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
-
-      window.onYouTubeIframeAPIReady = () => {
-        console.log('YouTube API Ready');
-      };
-    }
-  }, []);
 
   useEffect(() => {
     if (!playlistId) return;
     loadPlaylistData();
   }, [playlistId]);
 
-  useEffect(() => {
-    if (videos.length > 0 && window.YT && window.YT.Player) {
-      initializePlayer();
-    }
-  }, [currentVideoIndex, videos]);
-
-  // Auto-save progress every 5 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (playerRef.current && currentTime > 0) {
-        saveProgress(currentTime);
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [currentTime, currentVideoIndex]);
-
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      // Ignore if typing in input
       if (e.target instanceof HTMLInputElement) return;
 
       switch(e.key.toLowerCase()) {
@@ -108,16 +62,6 @@ const Player = () => {
         case '?':
           setShowKeyboardHelp(!showKeyboardHelp);
           break;
-        case ' ':
-          e.preventDefault();
-          togglePlayPause();
-          break;
-        case 'arrowleft':
-          seekBackward();
-          break;
-        case 'arrowright':
-          seekForward();
-          break;
         case 'm':
           handleMarkComplete();
           break;
@@ -127,90 +71,6 @@ const Player = () => {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [currentVideoIndex, videos, theaterMode, focusMode, showKeyboardHelp]);
-
-  const initializePlayer = () => {
-    if (!videos[currentVideoIndex]) return;
-
-    // Destroy existing player
-    if (playerRef.current) {
-      playerRef.current.destroy();
-    }
-
-    playerRef.current = new window.YT.Player('youtube-player', {
-      videoId: videos[currentVideoIndex].youtube_video_id,
-      playerVars: {
-        autoplay: 1,
-        rel: 0,
-        modestbranding: 1,
-        fs: 1,
-      },
-      events: {
-        onReady: onPlayerReady,
-        onStateChange: onPlayerStateChange,
-      },
-    });
-  };
-
-  const onPlayerReady = (event: any) => {
-    setDuration(event.target.getDuration());
-    
-    // Check for resume point
-    const currentProgress = progress.find(
-      p => p.video_id === videos[currentVideoIndex].id
-    );
-    
-    if (currentProgress && currentProgress.watch_time_seconds > 30 && !currentProgress.is_completed) {
-      setResumeTime(currentProgress.watch_time_seconds);
-      setShowResumePrompt(true);
-    }
-
-    // Update time every second
-    setInterval(() => {
-      if (playerRef.current && playerRef.current.getCurrentTime) {
-        setCurrentTime(playerRef.current.getCurrentTime());
-      }
-    }, 1000);
-  };
-
-  const onPlayerStateChange = (event: any) => {
-    // 1 = playing, 2 = paused
-    setIsPlaying(event.data === 1);
-
-    // Auto-play next video when current ends
-    if (event.data === 0) { // Video ended
-      handleMarkComplete();
-      setTimeout(handleNext, 2000);
-    }
-  };
-
-  const handleResume = () => {
-    if (playerRef.current) {
-      playerRef.current.seekTo(resumeTime);
-      setShowResumePrompt(false);
-    }
-  };
-
-  const togglePlayPause = () => {
-    if (playerRef.current) {
-      if (isPlaying) {
-        playerRef.current.pauseVideo();
-      } else {
-        playerRef.current.playVideo();
-      }
-    }
-  };
-
-  const seekForward = () => {
-    if (playerRef.current) {
-      playerRef.current.seekTo(currentTime + 10);
-    }
-  };
-
-  const seekBackward = () => {
-    if (playerRef.current) {
-      playerRef.current.seekTo(Math.max(0, currentTime - 10));
-    }
-  };
 
   const loadPlaylistData = async () => {
     try {
@@ -265,42 +125,6 @@ const Player = () => {
       toast.error("Failed to load playlist");
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const saveProgress = async (time: number) => {
-    if (!videos[currentVideoIndex]) return;
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    try {
-      const existingProgress = progress.find(
-        p => p.video_id === videos[currentVideoIndex].id
-      );
-
-      if (existingProgress) {
-        await supabase
-          .from("video_progress")
-          .update({
-            watch_time_seconds: Math.floor(time),
-            last_watched_at: new Date().toISOString(),
-          })
-          .eq("id", existingProgress.id);
-      } else {
-        await supabase
-          .from("video_progress")
-          .insert({
-            user_id: user.id,
-            video_id: videos[currentVideoIndex].id,
-            playlist_id: playlistId!,
-            watch_time_seconds: Math.floor(time),
-            is_completed: false,
-          });
-        loadPlaylistData();
-      }
-    } catch (error) {
-      console.error("Error saving progress:", error);
     }
   };
 
@@ -402,17 +226,17 @@ const Player = () => {
   const completedCount = videos.filter(v => getVideoProgress(v.id).completed).length;
 
   return (
-    <div className="min-h-screen bg-black flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col">
       {/* Header */}
-      <header className="bg-card/95 backdrop-blur border-b animate-in slide-in-from-top duration-300">
+      <header className="bg-slate-900/80 backdrop-blur-lg border-b border-slate-700">
         <div className="container mx-auto flex items-center gap-4 px-4 py-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="hover:bg-slate-800">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1 min-w-0">
-            <h1 className="font-semibold text-base truncate">{currentVideo.title}</h1>
-            <p className="text-xs text-muted-foreground">
-              Video {currentVideoIndex + 1} of {videos.length} • {formatTime(currentTime)} / {formatTime(duration)}
+            <h1 className="font-semibold text-base truncate text-white">{currentVideo.title}</h1>
+            <p className="text-xs text-slate-400">
+              Video {currentVideoIndex + 1} of {videos.length}
             </p>
           </div>
           <div className="flex gap-2">
@@ -421,6 +245,7 @@ const Player = () => {
               size="sm"
               onClick={() => setTheaterMode(!theaterMode)}
               title="Theater Mode (T)"
+              className="hover:bg-slate-800"
             >
               {theaterMode ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </Button>
@@ -429,6 +254,7 @@ const Player = () => {
               size="sm"
               onClick={() => setShowKeyboardHelp(true)}
               title="Keyboard Shortcuts (?)"
+              className="hover:bg-slate-800"
             >
               <Keyboard className="h-4 w-4" />
             </Button>
@@ -439,56 +265,26 @@ const Player = () => {
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Video Player Section */}
         <div 
-          className={`flex-1 flex flex-col transition-all duration-300 ${theaterMode ? 'lg:w-[90%]' : ''} ${focusMode ? 'w-full' : ''}`}
+          className={`flex-1 flex flex-col transition-all duration-300 ${theaterMode ? 'lg:w-[85%]' : ''} ${focusMode ? 'w-full' : ''}`}
         >
-          <div className="flex-1 flex items-center justify-center bg-black p-4 lg:p-6">
+          <div className="flex-1 flex items-center justify-center p-4 lg:p-6">
             <div className="w-full max-w-7xl space-y-4">
-              {/* YouTube Player */}
-              <div className="relative aspect-video bg-black rounded-lg overflow-hidden shadow-2xl">
-                <div id="youtube-player" className="w-full h-full" />
-                
-                {/* Resume Prompt */}
-                {showResumePrompt && (
-                  <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 animate-in fade-in duration-300">
-                    <Card className="p-6 space-y-4 bg-card/95 backdrop-blur animate-in zoom-in-95 duration-300">
-                      <h3 className="text-lg font-semibold">Continue watching?</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Resume from {formatTime(resumeTime)}
-                      </p>
-                      <div className="flex gap-3">
-                        <Button onClick={handleResume} className="flex-1">
-                          Resume
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          onClick={() => setShowResumePrompt(false)}
-                          className="flex-1"
-                        >
-                          Start from beginning
-                        </Button>
-                      </div>
-                    </Card>
-                  </div>
-                )}
-              </div>
-
-              {/* Progress Bar */}
-              <div className="space-y-2">
-                <Progress 
-                  value={duration > 0 ? (currentTime / duration) * 100 : 0} 
-                  className="h-2"
+              {/* YouTube Player - FIXED! */}
+              <div className="relative aspect-video bg-black rounded-xl overflow-hidden shadow-2xl">
+                <iframe
+                  src={`https://www.youtube.com/embed/${currentVideo.youtube_video_id}?autoplay=1&rel=0&modestbranding=1`}
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  title={currentVideo.title}
                 />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{formatTime(currentTime)}</span>
-                  <span>{formatTime(duration)}</span>
-                </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap gap-3 animate-in slide-in-from-bottom duration-500">
+              <div className="flex flex-wrap gap-3">
                 <Button
                   onClick={() => setShowNotesDialog(true)}
-                  className="bg-gradient-primary flex-1 sm:flex-initial"
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 flex-1 sm:flex-initial"
                 >
                   <Sparkles className="h-4 w-4 mr-2" />
                   Generate AI Notes
@@ -497,7 +293,7 @@ const Player = () => {
                 <Button
                   variant={currentProgress.completed ? "default" : "outline"}
                   onClick={handleMarkComplete}
-                  className="flex-1 sm:flex-initial"
+                  className="flex-1 sm:flex-initial bg-slate-800 hover:bg-slate-700 border-slate-600"
                 >
                   {currentProgress.completed ? (
                     <CheckCircle2 className="h-4 w-4 mr-2" />
@@ -510,7 +306,7 @@ const Player = () => {
                 <Button
                   variant="outline"
                   onClick={() => navigate(`/analytics/${playlistId}`)}
-                  className="flex-1 sm:flex-initial"
+                  className="flex-1 sm:flex-initial bg-slate-800 hover:bg-slate-700 border-slate-600"
                 >
                   <BarChart3 className="h-4 w-4 mr-2" />
                   Analytics
@@ -519,7 +315,7 @@ const Player = () => {
                 <Button
                   variant="outline"
                   onClick={() => setFocusMode(!focusMode)}
-                  className="flex-1 sm:flex-initial"
+                  className="flex-1 sm:flex-initial bg-slate-800 hover:bg-slate-700 border-slate-600"
                   title="Focus Mode (F)"
                 >
                   {focusMode ? "Exit Focus" : "Focus Mode"}
@@ -532,14 +328,14 @@ const Player = () => {
         {/* Playlist Sidebar */}
         {!focusMode && (
           <div 
-            className={`${theaterMode ? 'lg:w-[400px]' : 'lg:w-96'} w-full border-t lg:border-t-0 lg:border-l bg-card flex flex-col transition-all duration-300`}
+            className={`${theaterMode ? 'lg:w-[400px]' : 'lg:w-96'} w-full border-t lg:border-t-0 lg:border-l border-slate-700 bg-slate-900/95 backdrop-blur-lg flex flex-col transition-all duration-300`}
           >
             {/* Sidebar Header */}
-            <div className="p-4 border-b space-y-3 bg-card/95 backdrop-blur sticky top-0 z-10">
+            <div className="p-4 border-b border-slate-700 space-y-3 sticky top-0 z-10 bg-slate-900/95 backdrop-blur-lg">
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
-                  <h2 className="font-semibold truncate">{playlist.title}</h2>
-                  <p className="text-sm text-muted-foreground">
+                  <h2 className="font-semibold truncate text-white">{playlist.title}</h2>
+                  <p className="text-sm text-slate-400">
                     {completedCount} / {videos.length} completed
                   </p>
                 </div>
@@ -547,7 +343,7 @@ const Player = () => {
                   variant="ghost" 
                   size="icon"
                   onClick={() => setFocusMode(true)}
-                  className="lg:hidden"
+                  className="lg:hidden hover:bg-slate-800"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -555,16 +351,16 @@ const Player = () => {
 
               {/* Search */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   placeholder="Search videos..."
                   value={sidebarSearch}
                   onChange={(e) => setSidebarSearch(e.target.value)}
-                  className="pl-9 h-9"
+                  className="pl-9 h-9 bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
                 />
               </div>
 
-              <Progress value={(completedCount / videos.length) * 100} className="h-2" />
+              <Progress value={(completedCount / videos.length) * 100} className="h-2 bg-slate-800" />
             </div>
 
             {/* Video List */}
@@ -577,27 +373,23 @@ const Player = () => {
                   <button
                     key={video.id}
                     onClick={() => setCurrentVideoIndex(videos.findIndex(v => v.id === video.id))}
-                    className={`w-full p-3 flex gap-3 hover:bg-muted/50 transition-all duration-200 border-b ${
-                      isActive ? 'bg-primary/10 border-l-4 border-l-primary' : ''
+                    className={`w-full p-3 flex gap-3 hover:bg-slate-800/50 transition-all duration-200 border-b border-slate-800 ${
+                      isActive ? 'bg-blue-900/30 border-l-4 border-l-blue-500' : ''
                     }`}
                   >
                     <div className="relative flex-shrink-0">
                       <img
                         src={video.thumbnail_url}
                         alt={video.title}
-                        className="w-32 h-20 object-cover rounded shadow-md"
+                        className="w-32 h-20 object-cover rounded shadow-lg"
                       />
                       {isActive && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded">
-                          {isPlaying ? (
-                            <Pause className="h-8 w-8 text-white fill-white" />
-                          ) : (
-                            <Play className="h-8 w-8 text-white fill-white" />
-                          )}
+                          <Play className="h-8 w-8 text-white fill-white" />
                         </div>
                       )}
                       {!isActive && videoProgress.completed && (
-                        <div className="absolute top-1 right-1 bg-success rounded-full p-1">
+                        <div className="absolute top-1 right-1 bg-green-500 rounded-full p-1">
                           <CheckCircle2 className="h-4 w-4 text-white" />
                         </div>
                       )}
@@ -605,20 +397,20 @@ const Player = () => {
 
                     <div className="flex-1 text-left min-w-0">
                       <div className="flex items-start gap-2">
-                        <span className="text-xs text-muted-foreground font-mono mt-1">
+                        <span className="text-xs text-slate-500 font-mono mt-1">
                           #{index + 1}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium line-clamp-2 ${isActive ? 'text-primary' : ''}`}>
+                          <p className={`text-sm font-medium line-clamp-2 ${isActive ? 'text-blue-400' : 'text-white'}`}>
                             {video.title}
                           </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {Math.floor(video.duration_seconds / 60)}:{(video.duration_seconds % 60).toString().padStart(2, '0')}
+                          <p className="text-xs text-slate-400 mt-1">
+                            {formatTime(video.duration_seconds)}
                           </p>
                         </div>
                       </div>
                       {!videoProgress.completed && videoProgress.percentage > 0 && (
-                        <Progress value={videoProgress.percentage} className="h-1 mt-2" />
+                        <Progress value={videoProgress.percentage} className="h-1 mt-2 bg-slate-800" />
                       )}
                     </div>
                   </button>
@@ -632,52 +424,41 @@ const Player = () => {
       {/* Keyboard Shortcuts Dialog */}
       {showKeyboardHelp && (
         <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
           onClick={() => setShowKeyboardHelp(false)}
         >
-          <div
-            className="animate-in zoom-in-95 duration-300"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Card className="p-6 max-w-md">
-              <h3 className="text-xl font-bold mb-4">Keyboard Shortcuts</h3>
+          <div onClick={(e) => e.stopPropagation()}>
+            <Card className="p-6 max-w-md bg-slate-900 border-slate-700">
+              <h3 className="text-xl font-bold mb-4 text-white">Keyboard Shortcuts</h3>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Space</span>
-                  <span>Play / Pause</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">N</span>
+                <div className="flex justify-between text-white">
+                  <span className="text-slate-400">N</span>
                   <span>Next video</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">P</span>
+                <div className="flex justify-between text-white">
+                  <span className="text-slate-400">P</span>
                   <span>Previous video</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">M</span>
+                <div className="flex justify-between text-white">
+                  <span className="text-slate-400">M</span>
                   <span>Mark complete</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">T</span>
+                <div className="flex justify-between text-white">
+                  <span className="text-slate-400">T</span>
                   <span>Theater mode</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">F</span>
+                <div className="flex justify-between text-white">
+                  <span className="text-slate-400">F</span>
                   <span>Focus mode</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">← →</span>
-                  <span>Seek ±10s</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">?</span>
+                <div className="flex justify-between text-white">
+                  <span className="text-slate-400">?</span>
                   <span>Show shortcuts</span>
                 </div>
               </div>
               <Button 
                 onClick={() => setShowKeyboardHelp(false)} 
-                className="w-full mt-4"
+                className="w-full mt-4 bg-blue-600 hover:bg-blue-700"
               >
                 Got it!
               </Button>
