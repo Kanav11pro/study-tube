@@ -26,7 +26,8 @@ import {
   Coffee,
   X,
   Zap,
-  Award
+  Award,
+  GripVertical
 } from "lucide-react";
 import { toast } from "sonner";
 import { GenerateNotesDialog } from "@/components/GenerateNotesDialog";
@@ -46,6 +47,23 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // YouTube Player API types
 declare global {
@@ -55,11 +73,126 @@ declare global {
   }
 }
 
+// Sortable Video Item Component
+const SortableVideoItem = ({ video, index, isActive, onClick, videoProgress, formatTime }: any) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: video.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  // Get progress color
+  const getProgressColor = (percentage: number) => {
+    if (percentage >= 80) return 'bg-green-500';
+    if (percentage >= 50) return 'bg-yellow-500';
+    if (percentage >= 20) return 'bg-orange-500';
+    return 'bg-red-500';
+  };
+
+  const progressColor = videoProgress.completed 
+    ? 'bg-green-500' 
+    : getProgressColor(videoProgress.percentage);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`w-full flex items-center gap-2 border-b ${
+        isActive ? 'bg-primary/10 border-l-4 border-l-primary' : ''
+      }`}
+    >
+      {/* Drag Handle */}
+      <div 
+        {...attributes} 
+        {...listeners}
+        className="p-2 cursor-grab active:cursor-grabbing hover:bg-muted/50"
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+      </div>
+
+      {/* Main video button */}
+      <button
+        onClick={onClick}
+        className="flex-1 p-3 flex gap-3 hover:bg-muted/50 transition text-left"
+      >
+        <div className="relative flex-shrink-0">
+          <img
+            src={video.thumbnail_url}
+            alt={video.title}
+            className="w-32 h-20 object-cover rounded"
+          />
+          
+          {/* Progress overlay at bottom */}
+          {videoProgress.percentage > 0 && !videoProgress.completed && (
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
+              <div 
+                className={`h-full ${progressColor}`}
+                style={{ width: `${videoProgress.percentage}%` }}
+              />
+            </div>
+          )}
+
+          {/* Completed badge */}
+          {videoProgress.completed && (
+            <div className="absolute top-1 right-1 bg-green-600 rounded-full p-0.5">
+              <CheckCircle2 className="h-3 w-3 text-white" />
+            </div>
+          )}
+
+          {/* Active indicator */}
+          {isActive && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded">
+              <Play className="h-6 w-6 text-white fill-white" />
+            </div>
+          )}
+
+          {/* Duration badge */}
+          <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded">
+            {formatTime(video.duration_seconds)}
+          </div>
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-medium line-clamp-2 mb-1 ${isActive ? 'text-primary' : ''}`}>
+            {video.title}
+          </p>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+            <span>#{index + 1}</span>
+            {videoProgress.percentage > 0 && !videoProgress.completed && (
+              <span className={`font-medium ${
+                videoProgress.percentage >= 80 ? 'text-green-600' :
+                videoProgress.percentage >= 50 ? 'text-yellow-600' :
+                videoProgress.percentage >= 20 ? 'text-orange-600' :
+                'text-red-600'
+              }`}>
+                {Math.round(videoProgress.percentage)}% watched
+              </span>
+            )}
+            {videoProgress.completed && (
+              <span className="text-green-600 font-medium">✓ Completed</span>
+            )}
+          </div>
+        </div>
+      </button>
+    </div>
+  );
+};
+
 const Player = () => {
   const { playlistId } = useParams();
   const navigate = useNavigate();
   const playerRef = useRef<any>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const videoProgressUpdateRef = useRef<NodeJS.Timeout | null>(null);
   
   const [playlist, setPlaylist] = useState<any>(null);
   const [videos, setVideos] = useState<any[]>([]);
@@ -77,6 +210,7 @@ const Player = () => {
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [ytPlayerReady, setYtPlayerReady] = useState(false);
+  const [videoProgressPercentage, setVideoProgressPercentage] = useState(0);
   
   // Quick Notes
   const [showQuickNotes, setShowQuickNotes] = useState(false);
@@ -99,6 +233,14 @@ const Player = () => {
   // Stats
   const [completedCount, setCompletedCount] = useState(0);
   const [totalWatchTime, setTotalWatchTime] = useState(0);
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Load YouTube IFrame API
   useEffect(() => {
@@ -143,6 +285,12 @@ const Player = () => {
         try {
           const time = playerRef.current.getCurrentTime();
           setCurrentTime(time);
+          
+          // Update video progress percentage for live progress bar
+          if (duration > 0) {
+            const percentage = (time / duration) * 100;
+            setVideoProgressPercentage(percentage);
+          }
         } catch (e) {
           // Player not ready yet
         }
@@ -150,7 +298,7 @@ const Player = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [duration]);
 
   // Auto-save progress every 5 seconds
   useEffect(() => {
@@ -166,6 +314,21 @@ const Player = () => {
       }
     };
   }, [currentTime, currentVideoIndex, isPlaying]);
+
+  // Update playlist progress bar every 15 seconds
+  useEffect(() => {
+    videoProgressUpdateRef.current = setInterval(() => {
+      if (currentTime > 0 && isPlaying) {
+        updatePlaylistProgressBar();
+      }
+    }, 15000);
+
+    return () => {
+      if (videoProgressUpdateRef.current) {
+        clearInterval(videoProgressUpdateRef.current);
+      }
+    };
+  }, [currentTime, isPlaying, progress, videos]);
 
   // Study time tracker for break reminders
   useEffect(() => {
@@ -220,6 +383,7 @@ const Player = () => {
           if (e.ctrlKey || e.metaKey) {
             e.preventDefault();
             saveProgress(currentTime, true);
+            updatePlaylistProgressBar();
           }
           break;
         case 'q':
@@ -323,6 +487,7 @@ const Player = () => {
   const handleVideoEnd = async () => {
     await handleMarkComplete();
     toast.success('Video completed! ✓');
+    updatePlaylistProgressBar();
     
     if (autoPlay && currentVideoIndex < videos.length - 1) {
       setTimeout(() => {
@@ -339,30 +504,37 @@ const Player = () => {
   };
 
   const toggleShuffle = () => {
-    if (isShuffled) {
-      setVideos([...originalVideos]);
-      setIsShuffled(false);
-      toast.success('Back to original order');
+    setIsShuffled(!isShuffled);
+    if (!isShuffled) {
+      toast.success('Shuffle mode ON - Drag to reorder!');
     } else {
-      setIsShuffled(true);
-      toast.success('Shuffle mode ON - Use arrows to reorder!');
+      toast.success('Shuffle mode OFF - Order saved!');
     }
   };
 
-  const moveVideoUp = (index: number) => {
-    if (index === 0) return;
-    const newVideos = [...videos];
-    [newVideos[index], newVideos[index - 1]] = [newVideos[index - 1], newVideos[index]];
-    setVideos(newVideos);
-    toast.success('Video moved up');
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = videos.findIndex(v => v.id === active.id);
+      const newIndex = videos.findIndex(v => v.id === over.id);
+
+      const newVideos = arrayMove(videos, oldIndex, newIndex);
+      setVideos(newVideos);
+      toast.success('Video order updated');
+    }
   };
 
-  const moveVideoDown = (index: number) => {
-    if (index === videos.length - 1) return;
-    const newVideos = [...videos];
-    [newVideos[index], newVideos[index + 1]] = [newVideos[index + 1], newVideos[index]];
-    setVideos(newVideos);
-    toast.success('Video moved down');
+  const resetToOriginalOrder = () => {
+    setVideos([...originalVideos]);
+    setIsShuffled(false);
+    toast.success('Reset to original order');
+  };
+
+  const updatePlaylistProgressBar = () => {
+    // Force re-calculation of completed count
+    const completed = progress.filter(p => p.is_completed).length;
+    setCompletedCount(completed);
   };
 
   const showBreakReminder = () => {
@@ -464,6 +636,14 @@ const Player = () => {
             last_watched_at: new Date().toISOString(),
           })
           .eq("id", existingProgress.id);
+
+        // Update local progress state
+        const updatedProgress = progress.map(p =>
+          p.video_id === videos[currentVideoIndex].id
+            ? { ...p, watch_time_seconds: Math.floor(time) }
+            : p
+        );
+        setProgress(updatedProgress);
       } else {
         const { data: newProgress } = await supabase
           .from("video_progress")
@@ -505,15 +685,25 @@ const Player = () => {
       );
 
       if (existingProgress) {
+        const newCompletedState = !existingProgress.is_completed;
         await supabase
           .from("video_progress")
           .update({ 
-            is_completed: !existingProgress.is_completed,
+            is_completed: newCompletedState,
             watch_time_seconds: videos[currentVideoIndex].duration_seconds 
           })
           .eq("id", existingProgress.id);
+
+        // Update local state immediately
+        const updatedProgress = progress.map(p =>
+          p.video_id === videos[currentVideoIndex].id
+            ? { ...p, is_completed: newCompletedState }
+            : p
+        );
+        setProgress(updatedProgress);
+        setCompletedCount(updatedProgress.filter(p => p.is_completed).length);
       } else {
-        await supabase
+        const { data: newProgress } = await supabase
           .from("video_progress")
           .insert({
             user_id: user.id,
@@ -521,10 +711,16 @@ const Player = () => {
             playlist_id: playlistId!,
             watch_time_seconds: videos[currentVideoIndex].duration_seconds,
             is_completed: true,
-          });
+          })
+          .select()
+          .single();
+
+        if (newProgress) {
+          setProgress([...progress, newProgress]);
+          setCompletedCount(prev => prev + 1);
+        }
       }
 
-      await loadPlaylistData();
       toast.success(
         existingProgress?.is_completed ? "Marked as incomplete" : "Marked as complete ✓"
       );
@@ -538,6 +734,7 @@ const Player = () => {
     if (currentVideoIndex < videos.length - 1) {
       setCurrentVideoIndex(currentVideoIndex + 1);
       setCurrentTime(0);
+      setVideoProgressPercentage(0);
       toast.success("Next video");
     } else {
       toast.info("Playlist completed! 🎉");
@@ -548,6 +745,7 @@ const Player = () => {
     if (currentVideoIndex > 0) {
       setCurrentVideoIndex(currentVideoIndex - 1);
       setCurrentTime(0);
+      setVideoProgressPercentage(0);
       toast.success("Previous video");
     }
   };
@@ -573,6 +771,13 @@ const Player = () => {
       return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getProgressColor = (percentage: number) => {
+    if (percentage >= 80) return 'bg-green-500';
+    if (percentage >= 50) return 'bg-yellow-500';
+    if (percentage >= 20) return 'bg-orange-500';
+    return 'bg-red-500';
   };
 
   const filteredVideos = videos.filter(v => 
@@ -604,6 +809,7 @@ const Player = () => {
   const currentVideo = videos[currentVideoIndex];
   const currentProgress = getVideoProgress(currentVideo.id);
   const playlistProgress = (completedCount / videos.length) * 100;
+  const progressColor = getProgressColor(playlistProgress);
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
@@ -620,7 +826,10 @@ const Player = () => {
           </div>
         </div>
         
-        <Button variant="outline" size="sm" onClick={() => saveProgress(currentTime, true)}>
+        <Button variant="outline" size="sm" onClick={() => {
+          saveProgress(currentTime, true);
+          updatePlaylistProgressBar();
+        }}>
           <Save className="h-4 w-4 mr-1" />
           Save
         </Button>
@@ -633,33 +842,35 @@ const Player = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Video Section */}
         <div className="flex-1 flex flex-col overflow-y-auto">
-          {/* Video Player */}
-          <div className="relative w-full bg-black" style={{ paddingTop: '56.25%' }}>
-            <div className="absolute inset-0">
-              <div id="youtube-player" className="w-full h-full" />
+          {/* Video Player with padding */}
+          <div className="px-6 pt-4">
+            <div className="relative w-full bg-black rounded-lg overflow-hidden" style={{ paddingTop: '56.25%' }}>
+              <div className="absolute inset-0">
+                <div id="youtube-player" className="w-full h-full" />
+              </div>
+
+              <Button
+                variant="secondary"
+                size="icon"
+                className="absolute top-4 right-4 z-50"
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              >
+                {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+              </Button>
+
+              <Button
+                variant="secondary"
+                size="icon"
+                className="absolute top-4 left-4 z-50"
+                onClick={() => setShowQuickNotes(!showQuickNotes)}
+              >
+                <StickyNote className="h-4 w-4" />
+              </Button>
             </div>
-
-            <Button
-              variant="secondary"
-              size="icon"
-              className="absolute top-4 right-4 z-50"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            >
-              {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-            </Button>
-
-            <Button
-              variant="secondary"
-              size="icon"
-              className="absolute top-4 left-4 z-50"
-              onClick={() => setShowQuickNotes(!showQuickNotes)}
-            >
-              <StickyNote className="h-4 w-4" />
-            </Button>
           </div>
 
           {/* Video Info & Controls */}
-          <div className="bg-card border-t p-4 space-y-4 relative z-10">
+          <div className="bg-card p-6 space-y-4 relative z-10">
             <div className="flex items-start gap-4">
               <div className="flex-1 min-w-0">
                 <h1 className="text-lg font-semibold mb-1">{currentVideo.title}</h1>
@@ -677,12 +888,30 @@ const Player = () => {
               </div>
             </div>
 
+            {/* Enhanced Playlist Progress Bar */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Playlist Progress</span>
-                <span className="font-medium">{Math.round(playlistProgress)}%</span>
+                <span className="text-muted-foreground font-medium">Playlist Progress</span>
+                <div className="flex items-center gap-2">
+                  <span className={`font-bold ${
+                    playlistProgress >= 80 ? 'text-green-600' :
+                    playlistProgress >= 50 ? 'text-yellow-600' :
+                    playlistProgress >= 20 ? 'text-orange-600' :
+                    'text-red-600'
+                  }`}>
+                    {Math.round(playlistProgress)}%
+                  </span>
+                  <span className="text-muted-foreground">
+                    ({completedCount}/{videos.length})
+                  </span>
+                </div>
               </div>
-              <Progress value={playlistProgress} className="h-2" />
+              <div className="h-3 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className={`h-full ${progressColor} transition-all duration-500`}
+                  style={{ width: `${playlistProgress}%` }}
+                />
+              </div>
             </div>
 
             {/* Action Buttons */}
@@ -723,8 +952,19 @@ const Player = () => {
                 className="pointer-events-auto cursor-pointer"
               >
                 <Shuffle className="h-4 w-4 mr-1" />
-                Shuffle
+                {isShuffled ? 'Shuffled' : 'Shuffle'}
               </Button>
+
+              {isShuffled && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={resetToOriginalOrder}
+                  className="pointer-events-auto cursor-pointer"
+                >
+                  Reset Order
+                </Button>
+              )}
 
               <Button
                 variant="outline"
@@ -819,7 +1059,7 @@ const Player = () => {
           </div>
         )}
 
-        {/* Sidebar */}
+        {/* Sidebar with Drag & Drop */}
         {!sidebarCollapsed && !showQuickNotes && (
           <>
             <div
@@ -858,77 +1098,108 @@ const Player = () => {
               </div>
 
               <div className="flex-1 overflow-y-auto">
-                {filteredVideos.map((video, index) => {
-                  const videoProgress = getVideoProgress(video.id);
-                  const isActive = video.id === currentVideo.id;
-
-                  return (
-                    <div
-                      key={video.id}
-                      className={`w-full flex items-center gap-2 border-b ${
-                        isActive ? 'bg-primary/5 border-l-4 border-l-primary' : ''
-                      }`}
+                {isShuffled ? (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={filteredVideos.map(v => v.id)}
+                      strategy={verticalListSortingStrategy}
                     >
-                      {isShuffled && (
-                        <div className="flex flex-col gap-1 p-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => moveVideoUp(index)}
-                            disabled={index === 0}
-                          >
-                            <ChevronLeft className="h-3 w-3 rotate-90" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => moveVideoDown(index)}
-                            disabled={index === videos.length - 1}
-                          >
-                            <ChevronLeft className="h-3 w-3 -rotate-90" />
-                          </Button>
-                        </div>
-                      )}
+                      {filteredVideos.map((video, index) => {
+                        const videoProgress = getVideoProgress(video.id);
+                        const isActive = video.id === currentVideo.id;
 
+                        return (
+                          <SortableVideoItem
+                            key={video.id}
+                            video={video}
+                            index={index}
+                            isActive={isActive}
+                            onClick={() => setCurrentVideoIndex(videos.findIndex(v => v.id === video.id))}
+                            videoProgress={videoProgress}
+                            formatTime={formatTime}
+                          />
+                        );
+                      })}
+                    </SortableContext>
+                  </DndContext>
+                ) : (
+                  filteredVideos.map((video, index) => {
+                    const videoProgress = getVideoProgress(video.id);
+                    const isActive = video.id === currentVideo.id;
+                    const progressColor = videoProgress.completed 
+                      ? 'bg-green-500' 
+                      : getProgressColor(videoProgress.percentage);
+
+                    return (
                       <button
+                        key={video.id}
                         onClick={() => setCurrentVideoIndex(videos.findIndex(v => v.id === video.id))}
-                        className="flex-1 p-3 flex gap-3 hover:bg-muted/50 transition text-left"
+                        className={`w-full p-3 flex gap-3 hover:bg-muted/50 transition border-b text-left ${
+                          isActive ? 'bg-primary/10 border-l-4 border-l-primary' : ''
+                        }`}
                       >
                         <div className="relative flex-shrink-0">
                           <img
                             src={video.thumbnail_url}
                             alt={video.title}
-                            className="w-24 h-14 object-cover rounded"
+                            className="w-32 h-20 object-cover rounded"
                           />
+                          
+                          {videoProgress.percentage > 0 && !videoProgress.completed && (
+                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
+                              <div 
+                                className={`h-full ${progressColor}`}
+                                style={{ width: `${videoProgress.percentage}%` }}
+                              />
+                            </div>
+                          )}
+
                           {videoProgress.completed && (
                             <div className="absolute top-1 right-1 bg-green-600 rounded-full p-0.5">
                               <CheckCircle2 className="h-3 w-3 text-white" />
                             </div>
                           )}
+
                           {isActive && (
                             <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded">
-                              <Play className="h-5 w-5 text-white fill-white" />
+                              <Play className="h-6 w-6 text-white fill-white" />
                             </div>
                           )}
+
+                          <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded">
+                            {formatTime(video.duration_seconds)}
+                          </div>
                         </div>
 
                         <div className="flex-1 min-w-0">
                           <p className={`text-sm font-medium line-clamp-2 mb-1 ${isActive ? 'text-primary' : ''}`}>
                             {video.title}
                           </p>
-                          <div className="text-xs text-muted-foreground">
-                            #{index + 1} • {formatTime(video.duration_seconds)}
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                            <span>#{index + 1}</span>
+                            {videoProgress.percentage > 0 && !videoProgress.completed && (
+                              <span className={`font-medium ${
+                                videoProgress.percentage >= 80 ? 'text-green-600' :
+                                videoProgress.percentage >= 50 ? 'text-yellow-600' :
+                                videoProgress.percentage >= 20 ? 'text-orange-600' :
+                                'text-red-600'
+                              }`}>
+                                {Math.round(videoProgress.percentage)}% watched
+                              </span>
+                            )}
+                            {videoProgress.completed && (
+                              <span className="text-green-600 font-medium">✓ Completed</span>
+                            )}
                           </div>
-                          {videoProgress.percentage > 0 && !videoProgress.completed && (
-                            <Progress value={videoProgress.percentage} className="h-1 mt-1" />
-                          )}
                         </div>
                       </button>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
           </>
