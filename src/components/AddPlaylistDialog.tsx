@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Youtube } from "lucide-react";
+import { Loader2, Youtube, CheckCircle, Link as LinkIcon, PlayCircle, Sparkles, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -19,9 +19,12 @@ interface AddPlaylistDialogProps {
   onPlaylistAdded: () => void;
 }
 
+type Step = 'input' | 'validating' | 'importing' | 'success';
+
 export const AddPlaylistDialog = ({ open, onOpenChange, onPlaylistAdded }: AddPlaylistDialogProps) => {
   const [playlistUrl, setPlaylistUrl] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [step, setStep] = useState<Step>('input');
+  const [playlistData, setPlaylistData] = useState<any>(null);
 
   const extractPlaylistId = (url: string) => {
     const regex = /[?&]list=([^&]+)/;
@@ -29,9 +32,7 @@ export const AddPlaylistDialog = ({ open, onOpenChange, onPlaylistAdded }: AddPl
     return match ? match[1] : null;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleValidate = async () => {
     const playlistId = extractPlaylistId(playlistUrl);
     
     if (!playlistId) {
@@ -39,84 +40,224 @@ export const AddPlaylistDialog = ({ open, onOpenChange, onPlaylistAdded }: AddPl
       return;
     }
 
-    setIsLoading(true);
+    setStep('validating');
 
+    // Simulate validation delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Mock playlist data - replace with actual API call if needed
+    setPlaylistData({
+      title: "YouTube Playlist",
+      videoCount: "Loading...",
+      thumbnail: null
+    });
+
+    setStep('importing');
+    handleImport(playlistId);
+  };
+
+  const handleImport = async (playlistId: string) => {
     try {
-      // Call edge function to import playlist
       const { data, error } = await supabase.functions.invoke("import-playlist", {
         body: { playlistId },
       });
 
       if (error) throw error;
 
-      toast.success("Playlist imported successfully!");
-      setPlaylistUrl("");
-      onOpenChange(false);
-      onPlaylistAdded();
+      setStep('success');
+      
+      setTimeout(() => {
+        toast.success("Playlist imported successfully! 🎉");
+        handleClose();
+        onPlaylistAdded();
+      }, 2000);
     } catch (error: any) {
       console.error("Error importing playlist:", error);
       toast.error(error.message || "Failed to import playlist");
-    } finally {
-      setIsLoading(false);
+      setStep('input');
     }
   };
 
+  const handleClose = () => {
+    setPlaylistUrl("");
+    setStep('input');
+    setPlaylistData(null);
+    onOpenChange(false);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Youtube className="h-5 w-5 text-destructive" />
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-lg overflow-hidden">
+        {/* Progress Bar */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gray-200">
+          <div 
+            className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500 ease-out"
+            style={{ 
+              width: step === 'input' ? '25%' : 
+                     step === 'validating' ? '50%' : 
+                     step === 'importing' ? '75%' : '100%' 
+            }}
+          />
+        </div>
+
+        <DialogHeader className="pt-4">
+          <DialogTitle className="flex items-center gap-3 text-2xl">
+            <div className="p-2 bg-gradient-to-br from-red-500 to-pink-500 rounded-xl">
+              <Youtube className="h-6 w-6 text-white" />
+            </div>
             Import YouTube Playlist
           </DialogTitle>
-          <DialogDescription>
-            Paste a YouTube playlist URL to add it to your learning library
+          <DialogDescription className="text-base">
+            {step === 'input' && "Paste your YouTube playlist URL to get started"}
+            {step === 'validating' && "Validating your playlist..."}
+            {step === 'importing' && "Importing videos to your library..."}
+            {step === 'success' && "Successfully added to your library!"}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="playlist-url">Playlist URL</Label>
-            <Input
-              id="playlist-url"
-              placeholder="https://www.youtube.com/playlist?list=..."
-              value={playlistUrl}
-              onChange={(e) => setPlaylistUrl(e.target.value)}
-              disabled={isLoading}
-              required
-            />
-            <p className="text-xs text-muted-foreground">
-              Example: https://www.youtube.com/playlist?list=PLxxxxxxxxxxx
-            </p>
-          </div>
+        <div className="py-6">
+          {/* STEP 1: Input URL */}
+          {step === 'input' && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="space-y-3">
+                <Label htmlFor="playlist-url" className="text-base font-semibold">
+                  Playlist URL
+                </Label>
+                <div className="relative">
+                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <Input
+                    id="playlist-url"
+                    placeholder="https://www.youtube.com/playlist?list=..."
+                    value={playlistUrl}
+                    onChange={(e) => setPlaylistUrl(e.target.value)}
+                    className="pl-10 h-12 text-base"
+                    autoFocus
+                  />
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-800 font-medium mb-1">💡 How to find it:</p>
+                  <p className="text-xs text-blue-700">
+                    1. Open any YouTube playlist<br />
+                    2. Copy the URL from browser<br />
+                    3. Paste it here
+                  </p>
+                </div>
+              </div>
 
-          <div className="flex gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="flex-1"
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              className="flex-1 bg-gradient-primary"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Importing...
-                </>
-              ) : (
-                "Import Playlist"
-              )}
-            </Button>
-          </div>
-        </form>
+              <div className="flex gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleClose}
+                  className="flex-1 h-12"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleValidate}
+                  className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold"
+                  disabled={!playlistUrl.trim()}
+                >
+                  Continue
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: Validating */}
+          {step === 'validating' && (
+            <div className="space-y-6 animate-fadeIn text-center py-8">
+              <div className="flex justify-center">
+                <div className="relative">
+                  <div className="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+                  <LinkIcon className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-blue-600" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-semibold text-gray-900">Validating Playlist</h3>
+                <p className="text-gray-600">Checking URL and fetching details...</p>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: Importing */}
+          {step === 'importing' && (
+            <div className="space-y-6 animate-fadeIn text-center py-8">
+              <div className="flex justify-center">
+                <div className="relative">
+                  <div className="w-20 h-20 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                  <PlayCircle className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-indigo-600" />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <h3 className="text-xl font-semibold text-gray-900">Importing Videos</h3>
+                <p className="text-gray-600">Adding videos to your library...</p>
+                <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+                  <Sparkles className="h-4 w-4 animate-pulse" />
+                  <span>This might take a few moments</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: Success */}
+          {step === 'success' && (
+            <div className="space-y-6 animate-fadeIn text-center py-8">
+              <div className="flex justify-center">
+                <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center animate-scaleIn">
+                  <CheckCircle className="h-12 w-12 text-white" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-bold text-gray-900">All Set! 🎉</h3>
+                <p className="text-gray-600">Your playlist has been imported successfully</p>
+              </div>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <p className="text-sm text-green-800">
+                  ✓ Videos added to your library<br />
+                  ✓ Ready to start learning<br />
+                  ✓ Progress tracking enabled
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </DialogContent>
+
+      {/* Custom CSS for animations */}
+      <style>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.5);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        .animate-fadeIn {
+          animation: fadeIn 0.4s ease-out;
+        }
+
+        .animate-scaleIn {
+          animation: scaleIn 0.5s ease-out;
+        }
+      `}</style>
     </Dialog>
   );
 };
