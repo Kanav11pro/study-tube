@@ -344,17 +344,41 @@ const Player = () => {
   };
 
   const toggleShuffle = () => {
-    if (isShuffled) {
-      setVideos([...originalVideos]);
-      setIsShuffled(false);
-      toast.success('Shuffle disabled');
-    } else {
-      const shuffled = [...videos].sort(() => Math.random() - 0.5);
-      setVideos(shuffled);
-      setIsShuffled(true);
-      toast.success('Shuffle enabled!');
-    }
-  };
+  if (isShuffled) {
+    // Restore original order
+    setVideos([...originalVideos]);
+    setIsShuffled(false);
+    toast.success('Back to original order');
+  } else {
+    // Enable shuffle mode (manual reordering)
+    setIsShuffled(true);
+    toast.success('Shuffle mode ON - Drag videos to reorder!');
+  }
+};
+
+const moveVideoUp = (index: number) => {
+  if (index === 0) return;
+  const newVideos = [...videos];
+  [newVideos[index], newVideos[index - 1]] = [newVideos[index - 1], newVideos[index]];
+  setVideos(newVideos);
+  toast.success('Video moved up');
+};
+
+const moveVideoDown = (index: number) => {
+  if (index === videos.length - 1) return;
+  const newVideos = [...videos];
+  [newVideos[index], newVideos[index + 1]] = [newVideos[index + 1], newVideos[index]];
+  setVideos(newVideos);
+  toast.success('Video moved down');
+};
+
+const moveVideoToPosition = (fromIndex: number, toIndex: number) => {
+  const newVideos = [...videos];
+  const [movedVideo] = newVideos.splice(fromIndex, 1);
+  newVideos.splice(toIndex, 0, movedVideo);
+  setVideos(newVideos);
+};
+
 
   const showBreakReminder = () => {
     setShowBreakDialog(true);
@@ -857,13 +881,42 @@ const Player = () => {
                   const isActive = video.id === currentVideo.id;
 
                   return (
-                    <button
-                      key={video.id}
-                      onClick={() => setCurrentVideoIndex(videos.findIndex(v => v.id === video.id))}
-                      className={`w-full p-3 flex gap-3 hover:bg-muted/50 transition border-b text-left ${
-                        isActive ? 'bg-primary/5 border-l-4 border-l-primary' : ''
-                      }`}
-                    >
+                    <div
+  key={video.id}
+  className={`w-full flex items-center gap-2 border-b ${
+    isActive ? 'bg-primary/5 border-l-4 border-l-primary' : ''
+  }`}
+>
+  {/* Reorder buttons - only show in shuffle mode */}
+  {isShuffled && (
+    <div className="flex flex-col gap-1 p-2">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6"
+        onClick={() => moveVideoUp(index)}
+        disabled={index === 0}
+      >
+        <ChevronLeft className="h-3 w-3 rotate-90" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6"
+        onClick={() => moveVideoDown(index)}
+        disabled={index === videos.length - 1}
+      >
+        <ChevronLeft className="h-3 w-3 -rotate-90" />
+      </Button>
+    </div>
+  )}
+
+  {/* Main video button */}
+  <button
+    onClick={() => setCurrentVideoIndex(videos.findIndex(v => v.id === video.id))}
+    className="flex-1 p-3 flex gap-3 hover:bg-muted/50 transition text-left"
+  >
+
                       <div className="relative flex-shrink-0">
                         <img
                           src={video.thumbnail_url}
@@ -893,9 +946,11 @@ const Player = () => {
                           <Progress value={videoProgress.percentage} className="h-1 mt-1" />
                         )}
                       </div>
-                    </button>
-                  );
-                })}
+                  </button>
+                  </div>
+                );
+              })}
+
               </div>
             </div>
           </>
