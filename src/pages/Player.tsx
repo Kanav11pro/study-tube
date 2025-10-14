@@ -108,7 +108,6 @@ const Player = () => {
         return;
       }
 
-      // Load the IFrame Player API code asynchronously.
       const tag = document.createElement('script');
       tag.src = 'https://www.youtube.com/iframe_api';
       const firstScriptTag = document.getElementsByTagName('script')[0];
@@ -117,7 +116,6 @@ const Player = () => {
 
     loadYouTubeAPI();
 
-    // This function will be called by YouTube API when ready
     window.onYouTubeIframeAPIReady = () => {
       console.log('YouTube API is ready!');
       setYtPlayerReady(true);
@@ -265,7 +263,6 @@ const Player = () => {
   const initializePlayer = () => {
     if (!videos[currentVideoIndex]) return;
     
-    // Destroy existing player
     if (playerRef.current) {
       try {
         playerRef.current.destroy();
@@ -283,7 +280,7 @@ const Player = () => {
         videoId: videoToPlay.youtube_video_id,
         playerVars: {
           autoplay: 1,
-          controls: 1, // Keep controls for now for reliability
+          controls: 1,
           rel: 0,
           modestbranding: 1,
         },
@@ -302,7 +299,6 @@ const Player = () => {
     try {
       setDuration(event.target.getDuration());
       
-      // Check for resume point
       const currentProgress = progress.find(
         p => p.video_id === videos[currentVideoIndex]?.id
       );
@@ -317,10 +313,9 @@ const Player = () => {
   };
 
   const onPlayerStateChange = (event: any) => {
-    // -1: unstarted, 0: ended, 1: playing, 2: paused
     setIsPlaying(event.data === 1);
 
-    if (event.data === 0) { // Video ended
+    if (event.data === 0) {
       handleVideoEnd();
     }
   };
@@ -344,41 +339,31 @@ const Player = () => {
   };
 
   const toggleShuffle = () => {
-  if (isShuffled) {
-    // Restore original order
-    setVideos([...originalVideos]);
-    setIsShuffled(false);
-    toast.success('Back to original order');
-  } else {
-    // Enable shuffle mode (manual reordering)
-    setIsShuffled(true);
-    toast.success('Shuffle mode ON - Drag videos to reorder!');
-  }
-};
+    if (isShuffled) {
+      setVideos([...originalVideos]);
+      setIsShuffled(false);
+      toast.success('Back to original order');
+    } else {
+      setIsShuffled(true);
+      toast.success('Shuffle mode ON - Use arrows to reorder!');
+    }
+  };
 
-const moveVideoUp = (index: number) => {
-  if (index === 0) return;
-  const newVideos = [...videos];
-  [newVideos[index], newVideos[index - 1]] = [newVideos[index - 1], newVideos[index]];
-  setVideos(newVideos);
-  toast.success('Video moved up');
-};
+  const moveVideoUp = (index: number) => {
+    if (index === 0) return;
+    const newVideos = [...videos];
+    [newVideos[index], newVideos[index - 1]] = [newVideos[index - 1], newVideos[index]];
+    setVideos(newVideos);
+    toast.success('Video moved up');
+  };
 
-const moveVideoDown = (index: number) => {
-  if (index === videos.length - 1) return;
-  const newVideos = [...videos];
-  [newVideos[index], newVideos[index + 1]] = [newVideos[index + 1], newVideos[index]];
-  setVideos(newVideos);
-  toast.success('Video moved down');
-};
-
-const moveVideoToPosition = (fromIndex: number, toIndex: number) => {
-  const newVideos = [...videos];
-  const [movedVideo] = newVideos.splice(fromIndex, 1);
-  newVideos.splice(toIndex, 0, movedVideo);
-  setVideos(newVideos);
-};
-
+  const moveVideoDown = (index: number) => {
+    if (index === videos.length - 1) return;
+    const newVideos = [...videos];
+    [newVideos[index], newVideos[index + 1]] = [newVideos[index + 1], newVideos[index]];
+    setVideos(newVideos);
+    toast.success('Video moved down');
+  };
 
   const showBreakReminder = () => {
     setShowBreakDialog(true);
@@ -398,7 +383,6 @@ const moveVideoToPosition = (fromIndex: number, toIndex: number) => {
 
   const saveQuickNote = async () => {
     if (!quickNoteText.trim()) return;
-    // Note: This will fail without the table, but won't crash
     toast.info('Note saved locally (database table needed for persistence)');
     setQuickNoteText("");
   };
@@ -649,13 +633,12 @@ const moveVideoToPosition = (fromIndex: number, toIndex: number) => {
       <div className="flex-1 flex overflow-hidden">
         {/* Video Section */}
         <div className="flex-1 flex flex-col overflow-y-auto">
-          {/* Video Player - FIXED ASPECT RATIO */}
+          {/* Video Player */}
           <div className="relative w-full bg-black" style={{ paddingTop: '56.25%' }}>
             <div className="absolute inset-0">
               <div id="youtube-player" className="w-full h-full" />
             </div>
 
-            {/* Sidebar Toggle - FIXED */}
             <Button
               variant="secondary"
               size="icon"
@@ -665,7 +648,6 @@ const moveVideoToPosition = (fromIndex: number, toIndex: number) => {
               {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </Button>
 
-            {/* Quick Notes Toggle - FIXED */}
             <Button
               variant="secondary"
               size="icon"
@@ -676,7 +658,7 @@ const moveVideoToPosition = (fromIndex: number, toIndex: number) => {
             </Button>
           </div>
 
-          {/* Video Info & Controls - FIXED CLICKABILITY */}
+          {/* Video Info & Controls */}
           <div className="bg-card border-t p-4 space-y-4 relative z-10">
             <div className="flex items-start gap-4">
               <div className="flex-1 min-w-0">
@@ -703,7 +685,7 @@ const moveVideoToPosition = (fromIndex: number, toIndex: number) => {
               <Progress value={playlistProgress} className="h-2" />
             </div>
 
-            {/* Action Buttons - GUARANTEED CLICKABLE */}
+            {/* Action Buttons */}
             <div className="flex flex-wrap gap-2">
               <Button 
                 variant="outline" 
@@ -765,7 +747,7 @@ const moveVideoToPosition = (fromIndex: number, toIndex: number) => {
               </Button>
             </div>
 
-            {/* Navigation - GUARANTEED CLICKABLE */}
+            {/* Navigation */}
             <div className="flex items-center gap-2">
               <Button 
                 variant="outline" 
@@ -882,75 +864,71 @@ const moveVideoToPosition = (fromIndex: number, toIndex: number) => {
 
                   return (
                     <div
-  key={video.id}
-  className={`w-full flex items-center gap-2 border-b ${
-    isActive ? 'bg-primary/5 border-l-4 border-l-primary' : ''
-  }`}
->
-  {/* Reorder buttons - only show in shuffle mode */}
-  {isShuffled && (
-    <div className="flex flex-col gap-1 p-2">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6"
-        onClick={() => moveVideoUp(index)}
-        disabled={index === 0}
-      >
-        <ChevronLeft className="h-3 w-3 rotate-90" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6"
-        onClick={() => moveVideoDown(index)}
-        disabled={index === videos.length - 1}
-      >
-        <ChevronLeft className="h-3 w-3 -rotate-90" />
-      </Button>
-    </div>
-  )}
-
-  {/* Main video button */}
-  <button
-    onClick={() => setCurrentVideoIndex(videos.findIndex(v => v.id === video.id))}
-    className="flex-1 p-3 flex gap-3 hover:bg-muted/50 transition text-left"
-  >
-
-                      <div className="relative flex-shrink-0">
-                        <img
-                          src={video.thumbnail_url}
-                          alt={video.title}
-                          className="w-24 h-14 object-cover rounded"
-                        />
-                        {videoProgress.completed && (
-                          <div className="absolute top-1 right-1 bg-green-600 rounded-full p-0.5">
-                            <CheckCircle2 className="h-3 w-3 text-white" />
-                          </div>
-                        )}
-                        {isActive && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded">
-                            <Play className="h-5 w-5 text-white fill-white" />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium line-clamp-2 mb-1 ${isActive ? 'text-primary' : ''}`}>
-                          {video.title}
-                        </p>
-                        <div className="text-xs text-muted-foreground">
-                          #{index + 1} • {formatTime(video.duration_seconds)}
+                      key={video.id}
+                      className={`w-full flex items-center gap-2 border-b ${
+                        isActive ? 'bg-primary/5 border-l-4 border-l-primary' : ''
+                      }`}
+                    >
+                      {isShuffled && (
+                        <div className="flex flex-col gap-1 p-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => moveVideoUp(index)}
+                            disabled={index === 0}
+                          >
+                            <ChevronLeft className="h-3 w-3 rotate-90" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => moveVideoDown(index)}
+                            disabled={index === videos.length - 1}
+                          >
+                            <ChevronLeft className="h-3 w-3 -rotate-90" />
+                          </Button>
                         </div>
-                        {videoProgress.percentage > 0 && !videoProgress.completed && (
-                          <Progress value={videoProgress.percentage} className="h-1 mt-1" />
-                        )}
-                      </div>
-                  </button>
-                  </div>
-                );
-              })}
+                      )}
 
+                      <button
+                        onClick={() => setCurrentVideoIndex(videos.findIndex(v => v.id === video.id))}
+                        className="flex-1 p-3 flex gap-3 hover:bg-muted/50 transition text-left"
+                      >
+                        <div className="relative flex-shrink-0">
+                          <img
+                            src={video.thumbnail_url}
+                            alt={video.title}
+                            className="w-24 h-14 object-cover rounded"
+                          />
+                          {videoProgress.completed && (
+                            <div className="absolute top-1 right-1 bg-green-600 rounded-full p-0.5">
+                              <CheckCircle2 className="h-3 w-3 text-white" />
+                            </div>
+                          )}
+                          {isActive && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded">
+                              <Play className="h-5 w-5 text-white fill-white" />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium line-clamp-2 mb-1 ${isActive ? 'text-primary' : ''}`}>
+                            {video.title}
+                          </p>
+                          <div className="text-xs text-muted-foreground">
+                            #{index + 1} • {formatTime(video.duration_seconds)}
+                          </div>
+                          {videoProgress.percentage > 0 && !videoProgress.completed && (
+                            <Progress value={videoProgress.percentage} className="h-1 mt-1" />
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </>
