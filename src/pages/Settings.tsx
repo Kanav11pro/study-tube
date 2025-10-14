@@ -30,19 +30,19 @@ const Settings = () => {
         return;
       }
 
-      const { data: profileData } = await supabase
+      const { data: profileData } = await (supabase
         .from("profiles" as any)
         .select("*")
         .eq("id", user.id)
-        .single();
+        .single() as any);
 
       setProfile(profileData);
 
-      const { data: settingsData } = await supabase
+      const { data: settingsData } = await (supabase
         .from("user_settings" as any)
         .select("*")
         .eq("user_id", user.id)
-        .single();
+        .single() as any);
 
       setSettings(settingsData);
     } catch (error) {
@@ -57,14 +57,14 @@ const Settings = () => {
     
     setIsSaving(true);
     try {
-      const { error } = await supabase
+      const { error } = await (supabase
         .from("profiles" as any)
         .update({
           full_name: profile.full_name,
           exam_type: profile.exam_type,
           target_year: profile.target_year,
         })
-        .eq("id", profile.id);
+        .eq("id", profile.id) as any);
 
       if (error) throw error;
       toast.success("Profile updated successfully!");
@@ -81,7 +81,7 @@ const Settings = () => {
     
     setIsSaving(true);
     try {
-      const { error } = await supabase
+      const { error } = await (supabase
         .from("user_settings" as any)
         .update({
           auto_play_next: settings.auto_play_next,
@@ -89,7 +89,7 @@ const Settings = () => {
           auto_complete_percentage: settings.auto_complete_percentage,
           weekly_progress_email: settings.weekly_progress_email,
         })
-        .eq("id", settings.id);
+        .eq("id", settings.id) as any);
 
       if (error) throw error;
       toast.success("Settings updated successfully!");

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Flame, Clock, BookOpen, Sparkles, LogOut, FileText } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { toast } from "sonner";
 import { StatsCard } from "@/components/StatsCard";
 import { PlaylistCard } from "@/components/PlaylistCard";
@@ -36,20 +37,20 @@ const Dashboard = () => {
       setUser(user);
 
       // Fetch profile
-      const { data: profileData } = await supabase
-        .from("profiles")
+      const { data: profileData } = await (supabase
+        .from("profiles" as any)
         .select("*")
         .eq("id", user.id)
-        .single();
+        .single() as any);
 
       setProfile(profileData);
 
       // Fetch playlists
-      const { data: playlistsData } = await supabase
-        .from("playlists")
+      const { data: playlistsData } = await (supabase
+        .from("playlists" as any)
         .select("*")
         .eq("user_id", user.id)
-        .order("last_accessed_at", { ascending: false });
+        .order("last_accessed_at", { ascending: false }) as any);
 
       setPlaylists(playlistsData || []);
     } catch (error) {
@@ -89,6 +90,7 @@ const Dashboard = () => {
           </div>
           
           <div className="flex gap-2">
+            <ThemeToggle />
             <Button variant="outline" onClick={() => navigate("/notes")}>
               <FileText className="h-4 w-4 mr-2" />
               Notes

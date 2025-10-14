@@ -25,11 +25,11 @@ const Notes = () => {
         return;
       }
 
-      const { data: notesData } = await supabase
+      const { data: notesData } = await (supabase
         .from("ai_notes" as any)
         .select("*")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false }) as any);
 
       setNotes(notesData || []);
     } catch (error) {

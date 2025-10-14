@@ -4,9 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, TrendingUp, Clock, CheckCircle, Flame } from "lucide-react";
+import { ArrowLeft, TrendingUp, Clock, CheckCircle, Flame, Target, Award, Calendar } from "lucide-react";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { StatsCard } from "@/components/StatsCard";
+import { CountUpCard } from "@/components/CountUpCard";
+import { AnalyticsHeatmap } from "@/components/AnalyticsHeatmap";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Analytics = () => {
   const { playlistId } = useParams();
@@ -37,39 +39,39 @@ const Analytics = () => {
       }
 
       // Fetch playlist
-      const { data: playlistData } = await supabase
+      const { data: playlistData } = await (supabase
         .from("playlists" as any)
         .select("*")
         .eq("id", playlistId)
         .eq("user_id", user.id)
-        .single();
+        .single() as any);
 
       setPlaylist(playlistData);
 
       // Fetch videos count
-      const { data: videosData, count } = await supabase
+      const { data: videosData, count } = await (supabase
         .from("videos" as any)
         .select("*", { count: 'exact' })
-        .eq("playlist_id", playlistId);
+        .eq("playlist_id", playlistId) as any);
 
       // Fetch progress
-      const { data: progressData } = await supabase
+      const { data: progressData } = await (supabase
         .from("video_progress" as any)
         .select("*, videos(*)")
         .eq("user_id", user.id)
-        .eq("playlist_id", playlistId);
+        .eq("playlist_id", playlistId) as any);
 
       // Calculate stats
       const completed = progressData?.filter((p: any) => p.is_completed).length || 0;
       const totalWatchTime = progressData?.reduce((acc: number, p: any) => acc + (p.watch_time_seconds || 0), 0) || 0;
 
       // Fetch streaks
-      const { data: streaksData } = await supabase
+      const { data: streaksData } = await (supabase
         .from("study_streaks" as any)
         .select("*")
         .eq("user_id", user.id)
         .order("study_date", { ascending: false })
-        .limit(30);
+        .limit(90) as any);
 
       // Calculate current streak
       let currentStreak = 0;
@@ -128,10 +130,23 @@ const Analytics = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-center">
-          <div className="text-2xl font-bold text-primary">Loading...</div>
-        </div>
+      <div className="min-h-screen bg-background">
+        <header className="border-b bg-card p-4 sticky top-0 z-50">
+          <div className="container mx-auto flex items-center gap-4">
+            <Skeleton className="h-10 w-10 rounded" />
+            <div className="flex-1">
+              <Skeleton className="h-6 w-32 mb-2" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+          </div>
+        </header>
+        <main className="container mx-auto px-4 py-8 space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-32 w-full" />
+            ))}
+          </div>
+        </main>
       </div>
     );
   }
@@ -166,68 +181,125 @@ const Analytics = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8 space-y-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <StatsCard
+        {/* Stats Cards with Count Up Animation */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <CountUpCard
             title="Watch Time"
-            value={stats.totalWatchTime.toString()}
+            value={stats.totalWatchTime}
             unit="hours"
             icon={Clock}
             variant="primary"
+            decimals={0}
           />
-          <StatsCard
+          <CountUpCard
             title="Videos Completed"
-            value={stats.videosCompleted.toString()}
-            unit={`of ${stats.totalVideos}`}
+            value={stats.videosCompleted}
             icon={CheckCircle}
             variant="success"
           />
-          <StatsCard
+          <CountUpCard
             title="Completion"
-            value={completionPercentage.toString()}
+            value={completionPercentage}
             unit="%"
             icon={TrendingUp}
             variant="accent"
           />
-          <StatsCard
+          <CountUpCard
             title="Current Streak"
-            value={stats.currentStreak.toString()}
+            value={stats.currentStreak}
             unit="days"
             icon={Flame}
             variant="warning"
           />
+          <CountUpCard
+            title="Daily Goal"
+            value={Math.min(100, Math.round((stats.totalWatchTime / (parseInt(timeRange) * 2)) * 100))}
+            unit="%"
+            icon={Target}
+            variant="primary"
+          />
         </div>
+
+        {/* Study Heatmap */}
+        <AnalyticsHeatmap data={dailyData} />
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Daily Watch Time */}
-          <Card>
+          {/* Daily Watch Time Bar Chart */}
+          <Card className="animate-fade-in">
             <CardHeader>
-              <CardTitle>Daily Watch Time</CardTitle>
-              <CardDescription>Hours spent studying each day</CardDescription>
+              <CardTitle>Daily Breakdown</CardTitle>
+              <CardDescription>Hours per day (last {timeRange} days)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={dailyData}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fontSize: 12 }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: "hsl(var(--card))", 
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px"
+                    }}
+                  />
+                  <Bar 
+                    dataKey="hours" 
+                    fill="hsl(var(--primary))" 
+                    radius={[8, 8, 0, 0]}
+                    animationDuration={800}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Weekly Trends Line Chart */}
+          <Card className="animate-fade-in">
+            <CardHeader>
+              <CardTitle>Weekly Trends</CardTitle>
+              <CardDescription>Study time comparison</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={dailyData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: "hsl(var(--card))", 
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px"
+                    }}
+                  />
                   <Legend />
                   <Line 
                     type="monotone" 
                     dataKey="hours" 
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth={2}
-                    name="Watch Time (hours)"
+                    stroke="hsl(var(--success))" 
+                    strokeWidth={3}
+                    name="Study Hours"
+                    dot={{ fill: "hsl(var(--success))", r: 4 }}
+                    animationDuration={1000}
                   />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
-          {/* Progress Overview */}
-          <Card>
+          {/* Progress Donut Chart */}
+          <Card className="animate-scale-in">
             <CardHeader>
               <CardTitle>Progress Overview</CardTitle>
               <CardDescription>Completion status</CardDescription>
@@ -238,15 +310,16 @@ const Analytics = () => {
                   <Pie
                     data={[
                       { name: 'Completed', value: stats.videosCompleted },
-                      { name: 'Remaining', value: stats.totalVideos - stats.videosCompleted },
+                      { name: 'Remaining', value: Math.max(0, stats.totalVideos - stats.videosCompleted) },
                     ]}
                     cx="50%"
                     cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    innerRadius={60}
                     outerRadius={100}
-                    fill="hsl(var(--primary))"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}\n${(percent * 100).toFixed(0)}%`}
                     dataKey="value"
+                    animationDuration={800}
                   >
                     <Cell fill="hsl(var(--success))" />
                     <Cell fill="hsl(var(--muted))" />
@@ -254,6 +327,51 @@ const Analytics = () => {
                   <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Performance Metrics */}
+          <Card className="animate-scale-in">
+            <CardHeader>
+              <CardTitle>Performance Metrics</CardTitle>
+              <CardDescription>Your study statistics</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-success/10 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Award className="h-6 w-6 text-success" />
+                  <div>
+                    <p className="font-medium">Consistency Score</p>
+                    <p className="text-sm text-muted-foreground">Based on study regularity</p>
+                  </div>
+                </div>
+                <div className="text-2xl font-bold text-success">
+                  {Math.min(100, Math.round((stats.currentStreak / parseInt(timeRange)) * 100))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Average Session Length</span>
+                  <span className="font-medium">
+                    {stats.videosCompleted > 0 
+                      ? `${(stats.totalWatchTime / stats.videosCompleted).toFixed(1)}h` 
+                      : "0h"}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Best Study Day</span>
+                  <span className="font-medium">
+                    {dailyData.length > 0 
+                      ? dailyData.reduce((max, day) => day.hours > max.hours ? day : max).date
+                      : "N/A"}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Avg Completion Rate</span>
+                  <span className="font-medium">{completionPercentage}%</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
