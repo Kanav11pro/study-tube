@@ -2,11 +2,18 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Play, PlayCircle, Clock, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Play, PlayCircle, Clock, Trash2, MoreVertical, CheckCircle2, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { DeletePlaylistDialog } from "./DeletePlaylistDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface PlaylistCardProps {
   playlist: any;
@@ -16,28 +23,53 @@ interface PlaylistCardProps {
 export const PlaylistCard = ({ playlist, onDelete }: PlaylistCardProps) => {
   const navigate = useNavigate();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const completionPercentage = 0; // Will be calculated based on progress
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
+    const now = new Date();
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInHours / 24);
+    
+    if (diffInHours < 24) {
+      if (diffInHours < 1) return "Just now";
+      return `${diffInHours}h ago`;
+    } else if (diffInDays === 1) {
+      return "Yesterday";
+    } else if (diffInDays < 7) {
+      return `${diffInDays} days ago`;
+    }
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const getProgressColor = () => {
+    if (completionPercentage >= 80) return "bg-green-500";
+    if (completionPercentage >= 50) return "bg-yellow-500";
+    if (completionPercentage >= 20) return "bg-orange-500";
+    return "bg-blue-500";
+  };
+
+  const getProgressTextColor = () => {
+    if (completionPercentage >= 80) return "text-green-600";
+    if (completionPercentage >= 50) return "text-yellow-600";
+    if (completionPercentage >= 20) return "text-orange-600";
+    return "text-blue-600";
   };
 
   const handleDelete = async () => {
     try {
-      // Delete all video progress for this playlist
       await (supabase
         .from("video_progress" as any)
         .delete()
         .eq("playlist_id", playlist.id) as any);
 
-      // Delete all videos in this playlist
       await (supabase
         .from("videos" as any)
         .delete()
         .eq("playlist_id", playlist.id) as any);
 
-      // Delete the playlist
       const { error } = await (supabase
         .from("playlists" as any)
         .delete()
@@ -56,79 +88,159 @@ export const PlaylistCard = ({ playlist, onDelete }: PlaylistCardProps) => {
 
   return (
     <>
-      <Card className="group hover:shadow-lg transition-all duration-300 overflow-hidden cursor-pointer">
-        <div className="relative aspect-video overflow-hidden bg-muted">
-        {playlist.thumbnail_url ? (
-          <img
-            src={playlist.thumbnail_url}
-            alt={playlist.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <PlayCircle className="h-16 w-16 text-muted-foreground" />
-          </div>
-        )}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <Button
-            size="lg"
-            className="bg-primary hover:bg-primary/90"
-            onClick={() => navigate(`/player/${playlist.id}`)}
-          >
-            <Play className="h-5 w-5 mr-2" />
-            {completionPercentage > 0 ? "Continue" : "Start"}
-          </Button>
-        </div>
-      </div>
-
-      <CardHeader className="space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle className="line-clamp-2 text-lg flex-1">{playlist.title}</CardTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowDeleteDialog(true);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-        <CardDescription className="flex items-center gap-4 text-sm">
-          <span className="flex items-center gap-1">
-            <PlayCircle className="h-4 w-4" />
-            {playlist.total_videos} videos
-          </span>
-          {playlist.channel_name && (
-            <span className="truncate">{playlist.channel_name}</span>
+      <Card 
+        className="group hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer border-2 hover:border-primary/50 relative"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {/* Top Status Bar */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" />
+        
+        {/* Thumbnail Section */}
+        <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800">
+          {playlist.thumbnail_url ? (
+            <>
+              <img
+                src={playlist.thumbnail_url}
+                alt={playlist.title}
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              />
+              {/* Gradient Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+            </>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500/20 to-purple-500/20">
+              <PlayCircle className="h-20 w-20 text-white/40" />
+            </div>
           )}
-        </CardDescription>
-      </CardHeader>
 
-      <CardContent className="space-y-3">
-        <div className="space-y-1">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Progress</span>
-            <span className="font-medium">{completionPercentage}%</span>
+          {/* Progress Badge on Thumbnail */}
+          {completionPercentage > 0 && (
+            <div className="absolute top-3 left-3 z-10">
+              <Badge className={`${getProgressColor()} text-white border-0 shadow-lg`}>
+                {completionPercentage >= 100 ? (
+                  <>
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Completed
+                  </>
+                ) : (
+                  <>
+                    <TrendingUp className="h-3 w-3 mr-1" />
+                    {completionPercentage}%
+                  </>
+                )}
+              </Badge>
+            </div>
+          )}
+
+          {/* Three Dots Menu - Top Right */}
+          <div className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="h-8 w-8 bg-white/90 backdrop-blur-sm hover:bg-white shadow-lg"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  className="text-red-600 focus:text-red-600 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDeleteDialog(true);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Playlist
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <Progress value={completionPercentage} className="h-2" />
+
+          {/* Play Button Overlay */}
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+            <Button
+              size="lg"
+              className="bg-white text-black hover:bg-white/90 shadow-2xl transform scale-90 group-hover:scale-100 transition-transform duration-300"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/player/${playlist.id}`);
+              }}
+            >
+              <Play className="h-5 w-5 mr-2 fill-black" />
+              {completionPercentage > 0 ? "Continue Watching" : "Start Learning"}
+            </Button>
+          </div>
+
+          {/* Video Count Badge - Bottom Right */}
+          <div className="absolute bottom-3 right-3">
+            <Badge variant="secondary" className="bg-black/70 text-white backdrop-blur-sm border-0">
+              <PlayCircle className="h-3 w-3 mr-1" />
+              {playlist.total_videos} videos
+            </Badge>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Clock className="h-3 w-3" />
-          Last accessed {formatDate(playlist.last_accessed_at)}
-        </div>
-      </CardContent>
-    </Card>
+        {/* Content Section */}
+        <div onClick={() => navigate(`/player/${playlist.id}`)}>
+          <CardHeader className="space-y-3 pb-3">
+            <CardTitle className="line-clamp-2 text-lg leading-tight group-hover:text-primary transition-colors">
+              {playlist.title}
+            </CardTitle>
+            {playlist.channel_name && (
+              <CardDescription className="flex items-center gap-2 text-sm">
+                <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                  {playlist.channel_name.charAt(0).toUpperCase()}
+                </div>
+                <span className="truncate">{playlist.channel_name}</span>
+              </CardDescription>
+            )}
+          </CardHeader>
 
-    <DeletePlaylistDialog
-      open={showDeleteDialog}
-      onOpenChange={setShowDeleteDialog}
-      playlistTitle={playlist.title}
-      onConfirm={handleDelete}
-    />
+          <CardContent className="space-y-4 pt-0">
+            {/* Progress Section */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground font-medium">Progress</span>
+                <span className={`font-bold ${getProgressTextColor()}`}>
+                  {completionPercentage}%
+                </span>
+              </div>
+              <div className="relative">
+                <Progress value={completionPercentage} className="h-2 bg-gray-200" />
+                <div 
+                  className={`absolute top-0 left-0 h-2 ${getProgressColor()} rounded-full transition-all duration-500`}
+                  style={{ width: `${completionPercentage}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Footer Info */}
+            <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t">
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" />
+                <span>{formatDate(playlist.last_accessed_at)}</span>
+              </div>
+              {completionPercentage >= 100 && (
+                <Badge variant="outline" className="text-green-600 border-green-600">
+                  ✓ Done
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </div>
+      </Card>
+
+      <DeletePlaylistDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        playlistTitle={playlist.title}
+        onConfirm={handleDelete}
+      />
     </>
   );
 };
