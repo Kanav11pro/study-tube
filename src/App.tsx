@@ -11,7 +11,7 @@ import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Notes from "./pages/Notes";
 import NotFound from "./pages/NotFound";
-import StudyTips from "@/pages/StudyTips";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -28,7 +28,6 @@ const App = () => (
           <Route path="/analytics/:playlistId" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/notes" element={<Notes />} />
-          <Route path="/tips" element={<StudyTips />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
