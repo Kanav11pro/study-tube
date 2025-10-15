@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react"; 
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -237,7 +237,6 @@ const Player = () => {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   
   // Dialogs
-  const [showNotesDialog, setShowNotesDialog] = useState(false);
   const [showAddVideoDialog, setShowAddVideoDialog] = useState(false);
   const [isCustomPlaylist, setIsCustomPlaylist] = useState(false);
   
