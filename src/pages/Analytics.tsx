@@ -146,7 +146,7 @@ const Analytics = () => {
         averageSessionTime: completed > 0 ? totalWatchTime / completed / 3600 : 0,
       });
 
-      // Generate daily data
+      // Generate daily data Based on progress
       const days = parseInt(timeRange);
       const chartData = [];
       
