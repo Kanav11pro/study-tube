@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { GenerateNotesDialog } from "@/components/GenerateNotesDialog";
+import { AddVideoToPlaylistDialog } from "@/components/AddVideoToPlaylistDialog";
 import {
   Dialog,
   DialogContent,
@@ -215,7 +216,12 @@ const Player = () => {
   // Quick Notes
   const [showQuickNotes, setShowQuickNotes] = useState(false);
   const [quickNoteText, setQuickNoteText] = useState("");
-  const [savedNotes, setSavedNotes] = useState<any[]>([]);
+  const [quickNotes, setQuickNotes] = useState<Array<{ 
+    id: string;
+    time: number; 
+    text: string; 
+    timestamp: string;
+  }>>([]);
   
   // Break Reminders
   const [breakReminderEnabled, setBreakReminderEnabled] = useState(false);
@@ -229,6 +235,11 @@ const Player = () => {
   
   // Keyboard Shortcuts
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  
+  // Dialogs
+  const [showNotesDialog, setShowNotesDialog] = useState(false);
+  const [showAddVideoDialog, setShowAddVideoDialog] = useState(false);
+  const [isCustomPlaylist, setIsCustomPlaylist] = useState(false);
   
   // Stats
   const [completedCount, setCompletedCount] = useState(0);
@@ -553,10 +564,60 @@ const Player = () => {
     toast.success('Enjoy your break! 🌟');
   };
 
-  const saveQuickNote = async () => {
-    if (!quickNoteText.trim()) return;
-    toast.info('Note saved locally (database table needed for persistence)');
-    setQuickNoteText("");
+  const addQuickNote = async () => {
+    if (!quickNoteText.trim() || !playerRef.current || !currentVideo) return;
+    
+    const currentTime = Math.floor(playerRef.current.getCurrentTime());
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase
+        .from("video_notes" as any)
+        .insert({
+          user_id: user.id,
+          video_id: currentVideo.id,
+          playlist_id: playlistId,
+          note_text: quickNoteText,
+          timestamp_seconds: currentTime,
+        })
+        .select()
+        .single() as any;
+
+      if (error) throw error;
+
+      const note = {
+        id: data.id,
+        time: currentTime,
+        text: quickNoteText,
+        timestamp: formatTime(currentTime),
+      };
+
+      setQuickNotes(prev => [note, ...prev]);
+      setQuickNoteText("");
+      toast.success("Note saved successfully! 📝");
+    } catch (error: any) {
+      console.error("Error saving note:", error);
+      toast.error("Failed to save note");
+    }
+  };
+
+  const deleteQuickNote = async (noteId: string) => {
+    try {
+      const { error } = await supabase
+        .from("video_notes" as any)
+        .delete()
+        .eq("id", noteId) as any;
+
+      if (error) throw error;
+
+      setQuickNotes(prev => prev.filter(note => note.id !== noteId));
+      toast.success("Note deleted");
+    } catch (error: any) {
+      console.error("Error deleting note:", error);
+      toast.error("Failed to delete note");
+    }
   };
 
   const loadPlaylistData = async () => {
@@ -567,47 +628,60 @@ const Player = () => {
         return;
       }
 
-      const { data: playlistData, error: playlistError } = await supabase
-        .from("playlists")
+      const { data: playlistData, error: playlistError } = await (supabase
+        .from("playlists" as any)
         .select("*")
         .eq("id", playlistId)
         .eq("user_id", user.id)
-        .single();
+        .single() as any);
 
       if (playlistError) throw playlistError;
       setPlaylist(playlistData);
+      
+      // Check if it's a custom playlist
+      setIsCustomPlaylist(playlistData?.youtube_playlist_id?.startsWith('custom_') || false);
 
-      const { data: videosData, error: videosError } = await supabase
-        .from("videos")
+      const { data: videosData, error: videosError } = await (supabase
+        .from("videos" as any)
         .select("*")
         .eq("playlist_id", playlistId)
-        .order("position_order", { ascending: true });
+        .order("position_order", { ascending: true }) as any);
 
       if (videosError) throw videosError;
       setVideos(videosData || []);
       setOriginalVideos(videosData || []);
 
-      const { data: progressData } = await supabase
-        .from("video_progress")
+      const { data: progressData } = await (supabase
+        .from("video_progress" as any)
         .select("*")
         .eq("user_id", user.id)
-        .eq("playlist_id", playlistId);
+        .eq("playlist_id", playlistId) as any);
 
       setProgress(progressData || []);
-      setCompletedCount(progressData?.filter(p => p.is_completed).length || 0);
+      setCompletedCount(progressData?.filter((p: any) => p.is_completed).length || 0);
 
       if (progressData && progressData.length > 0) {
-        const lastWatched = progressData.reduce((prev, current) => 
+        const lastWatched = progressData.reduce((prev: any, current: any) => 
           new Date(current.last_watched_at) > new Date(prev.last_watched_at) ? current : prev
         );
-        const videoIndex = videosData?.findIndex(v => v.id === lastWatched.video_id) || 0;
+        const videoIndex = videosData?.findIndex((v: any) => v.id === lastWatched.video_id) || 0;
         setCurrentVideoIndex(Math.max(0, videoIndex));
       }
+      
+      // Set first video as current if available
+      if (videosData && videosData.length > 0 && currentVideoIndex === 0) {
+        // Force player to load the video after it's ready
+        setTimeout(() => {
+          if (playerRef.current && videosData[currentVideoIndex]) {
+            playerRef.current.loadVideoById(videosData[currentVideoIndex].youtube_video_id);
+          }
+        }, 500);
+      }
 
-      await supabase
-        .from("playlists")
+      await (supabase
+        .from("playlists" as any)
         .update({ last_accessed_at: new Date().toISOString() })
-        .eq("id", playlistId);
+        .eq("id", playlistId) as any);
 
     } catch (error) {
       console.error("Error loading playlist:", error);
@@ -629,16 +703,16 @@ const Player = () => {
       );
 
       if (existingProgress) {
-        await supabase
-          .from("video_progress")
+        await (supabase
+          .from("video_progress" as any)
           .update({
             watch_time_seconds: Math.floor(time),
             last_watched_at: new Date().toISOString(),
           })
-          .eq("id", existingProgress.id);
+          .eq("id", existingProgress.id) as any);
 
         // Update local progress state
-        const updatedProgress = progress.map(p =>
+        const updatedProgress = progress.map((p: any) =>
           p.video_id === videos[currentVideoIndex].id
             ? { ...p, watch_time_seconds: Math.floor(time) }
             : p

@@ -19,12 +19,14 @@ interface AddPlaylistDialogProps {
   onPlaylistAdded: () => void;
 }
 
-type Step = 'input' | 'validating' | 'importing' | 'success';
+type Step = 'input' | 'validating' | 'importing' | 'success' | 'create-custom';
 
 export const AddPlaylistDialog = ({ open, onOpenChange, onPlaylistAdded }: AddPlaylistDialogProps) => {
   const [playlistUrl, setPlaylistUrl] = useState("");
   const [step, setStep] = useState<Step>('input');
   const [playlistData, setPlaylistData] = useState<any>(null);
+  const [customPlaylistName, setCustomPlaylistName] = useState("");
+  const [detectedVideoId, setDetectedVideoId] = useState<string | null>(null);
 
   const extractPlaylistId = (url: string) => {
     const regex = /[?&]list=([^&]+)/;
@@ -32,11 +34,25 @@ export const AddPlaylistDialog = ({ open, onOpenChange, onPlaylistAdded }: AddPl
     return match ? match[1] : null;
   };
 
+  const extractVideoId = (url: string) => {
+    const regex = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?\/]+)/;
+    const match = url.match(regex);
+    return match ? match[1] : null;
+  };
+
   const handleValidate = async () => {
     const playlistId = extractPlaylistId(playlistUrl);
+    const videoId = extractVideoId(playlistUrl);
+    
+    // Check if it's a single video
+    if (videoId && !playlistId) {
+      setDetectedVideoId(videoId);
+      setStep('create-custom');
+      return;
+    }
     
     if (!playlistId) {
-      toast.error("Invalid YouTube playlist URL");
+      toast.error("Invalid YouTube URL. Please provide a playlist or video URL.");
       return;
     }
 
@@ -54,6 +70,98 @@ export const AddPlaylistDialog = ({ open, onOpenChange, onPlaylistAdded }: AddPl
 
     setStep('importing');
     handleImport(playlistId);
+  };
+
+  const handleCreateCustomPlaylist = async () => {
+    if (!customPlaylistName.trim() || !detectedVideoId) {
+      toast.error("Please enter a playlist name");
+      return;
+    }
+
+    setStep('importing');
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Unauthorized");
+
+      const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
+      
+      if (!YOUTUBE_API_KEY) {
+        throw new Error("YouTube API key not configured");
+      }
+
+      // Fetch video details
+      const response = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${detectedVideoId}&key=${YOUTUBE_API_KEY}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch video details");
+      }
+
+      const data = await response.json();
+
+      if (!data.items || data.items.length === 0) {
+        throw new Error("Video not found");
+      }
+
+      const videoInfo = data.items[0];
+
+      // Create custom playlist
+      const { data: playlist, error: playlistError } = await (supabase
+        .from("playlists" as any)
+        .insert({
+          user_id: user.id,
+          youtube_playlist_id: `custom_${Date.now()}`,
+          title: customPlaylistName,
+          description: "Custom playlist",
+          channel_name: videoInfo.snippet.channelTitle,
+          thumbnail_url:
+            videoInfo.snippet.thumbnails?.medium?.url ||
+            videoInfo.snippet.thumbnails?.default?.url,
+          total_videos: 1,
+        })
+        .select()
+        .single() as any);
+
+      if (playlistError || !playlist) throw playlistError;
+
+      // Parse duration
+      const parseDuration = (duration: string): number => {
+        const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+        if (!match) return 0;
+        const hours = parseInt(match[1] || "0");
+        const minutes = parseInt(match[2] || "0");
+        const seconds = parseInt(match[3] || "0");
+        return hours * 3600 + minutes * 60 + seconds;
+      };
+
+      // Insert video
+      const { error: videoError } = await (supabase.from("videos" as any).insert({
+        playlist_id: playlist.id,
+        youtube_video_id: detectedVideoId,
+        title: videoInfo.snippet.title,
+        thumbnail_url:
+          videoInfo.snippet.thumbnails?.medium?.url ||
+          videoInfo.snippet.thumbnails?.default?.url,
+        position_order: 0,
+        duration_seconds: parseDuration(videoInfo.contentDetails.duration),
+      }) as any);
+
+      if (videoError) throw videoError;
+
+      setStep('success');
+      
+      setTimeout(() => {
+        toast.success("Custom playlist created successfully! 🎉");
+        handleClose();
+        onPlaylistAdded();
+      }, 2000);
+    } catch (error: any) {
+      console.error("Error creating custom playlist:", error);
+      toast.error(error.message || "Failed to create custom playlist");
+      setStep('create-custom');
+    }
   };
 
   const handleImport = async (playlistId: string) => {
@@ -82,6 +190,8 @@ export const AddPlaylistDialog = ({ open, onOpenChange, onPlaylistAdded }: AddPl
     setPlaylistUrl("");
     setStep('input');
     setPlaylistData(null);
+    setCustomPlaylistName("");
+    setDetectedVideoId(null);
     onOpenChange(false);
   };
 
@@ -108,7 +218,8 @@ export const AddPlaylistDialog = ({ open, onOpenChange, onPlaylistAdded }: AddPl
             Import YouTube Playlist
           </DialogTitle>
           <DialogDescription className="text-base">
-            {step === 'input' && "Paste your YouTube playlist URL to get started"}
+            {step === 'input' && "Paste your YouTube playlist or video URL to get started"}
+            {step === 'create-custom' && "Create a custom playlist with this video"}
             {step === 'validating' && "Validating your playlist..."}
             {step === 'importing' && "Importing videos to your library..."}
             {step === 'success' && "Successfully added to your library!"}
@@ -127,7 +238,7 @@ export const AddPlaylistDialog = ({ open, onOpenChange, onPlaylistAdded }: AddPl
                   <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <Input
                     id="playlist-url"
-                    placeholder="https://www.youtube.com/playlist?list=..."
+                    placeholder="Playlist or Video URL..."
                     value={playlistUrl}
                     onChange={(e) => setPlaylistUrl(e.target.value)}
                     className="pl-10 h-12 text-base"
@@ -135,11 +246,11 @@ export const AddPlaylistDialog = ({ open, onOpenChange, onPlaylistAdded }: AddPl
                   />
                 </div>
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-sm text-blue-800 font-medium mb-1">💡 How to find it:</p>
+                  <p className="text-sm text-blue-800 font-medium mb-1">💡 Supports:</p>
                   <p className="text-xs text-blue-700">
-                    1. Open any YouTube playlist<br />
-                    2. Copy the URL from browser<br />
-                    3. Paste it here
+                    • Full YouTube playlists<br />
+                    • Single YouTube videos (creates custom playlist)<br />
+                    • Just paste any YouTube URL
                   </p>
                 </div>
               </div>
@@ -160,6 +271,52 @@ export const AddPlaylistDialog = ({ open, onOpenChange, onPlaylistAdded }: AddPl
                   disabled={!playlistUrl.trim()}
                 >
                   Continue
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+           )}
+
+          {/* STEP 1.5: Create Custom Playlist */}
+          {step === 'create-custom' && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800 font-medium mb-1">📹 Single Video Detected</p>
+                <p className="text-xs text-blue-700">
+                  This is a single video. Create a custom playlist to organize it!
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <Label htmlFor="playlist-name" className="text-base font-semibold">
+                  Custom Playlist Name
+                </Label>
+                <Input
+                  id="playlist-name"
+                  placeholder="e.g., Physics Revision, JEE Prep..."
+                  value={customPlaylistName}
+                  onChange={(e) => setCustomPlaylistName(e.target.value)}
+                  className="h-12 text-base"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleClose}
+                  className="flex-1 h-12"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleCreateCustomPlaylist}
+                  className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold"
+                  disabled={!customPlaylistName.trim()}
+                >
+                  Create Playlist
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>

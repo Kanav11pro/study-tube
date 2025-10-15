@@ -196,7 +196,11 @@ const Dashboard = () => {
                   playlist.title.toLowerCase().includes(searchQuery.toLowerCase())
                 )
                 .map((playlist) => (
-                  <PlaylistCard key={playlist.id} playlist={playlist} />
+                  <PlaylistCard 
+                    key={playlist.id} 
+                    playlist={playlist}
+                    onDelete={() => checkUser()}
+                  />
                 ))}
             </div>
           )}
