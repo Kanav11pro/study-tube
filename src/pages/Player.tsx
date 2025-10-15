@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef } from "react"; 
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { 
   ArrowLeft, 
   CheckCircle2, 
@@ -27,7 +28,18 @@ import {
   X,
   Zap,
   Award,
-  GripVertical
+  GripVertical,
+  Plus,
+  Clock,
+  Gauge,
+  Link as LinkIcon,
+  Copy,
+  CheckCheck,
+  Maximize,
+  SkipForward,
+  SkipBack,
+  PictureInPicture2,
+  Focus
 } from "lucide-react";
 import { toast } from "sonner";
 import { GenerateNotesDialog } from "@/components/GenerateNotesDialog";
@@ -49,6 +61,12 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   DndContext,
   closestCenter,
   KeyboardSensor,
@@ -66,7 +84,6 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-// YouTube Player API types
 declare global {
   interface Window {
     YT: any;
@@ -74,7 +91,6 @@ declare global {
   }
 }
 
-// Sortable Video Item Component
 const SortableVideoItem = ({ video, index, isActive, onClick, videoProgress, formatTime }: any) => {
   const {
     attributes,
@@ -91,7 +107,6 @@ const SortableVideoItem = ({ video, index, isActive, onClick, videoProgress, for
     opacity: isDragging ? 0.5 : 1,
   };
 
-  // Get progress color
   const getProgressColor = (percentage: number) => {
     if (percentage >= 80) return 'bg-green-500';
     if (percentage >= 50) return 'bg-yellow-500';
@@ -111,7 +126,6 @@ const SortableVideoItem = ({ video, index, isActive, onClick, videoProgress, for
         isActive ? 'bg-primary/10 border-l-4 border-l-primary' : ''
       }`}
     >
-      {/* Drag Handle */}
       <div 
         {...attributes} 
         {...listeners}
@@ -120,19 +134,17 @@ const SortableVideoItem = ({ video, index, isActive, onClick, videoProgress, for
         <GripVertical className="h-4 w-4 text-muted-foreground" />
       </div>
 
-      {/* Main video button */}
       <button
         onClick={onClick}
-        className="flex-1 p-3 flex gap-3 hover:bg-muted/50 transition text-left"
+        className="flex-1 p-3 flex gap-3 hover:bg-muted/50 transition text-left group"
       >
-        <div className="relative flex-shrink-0">
+        <div className="relative flex-shrink-0 transform group-hover:scale-105 transition-transform">
           <img
             src={video.thumbnail_url}
             alt={video.title}
             className="w-32 h-20 object-cover rounded"
           />
           
-          {/* Progress overlay at bottom */}
           {videoProgress.percentage > 0 && !videoProgress.completed && (
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
               <div 
@@ -142,21 +154,18 @@ const SortableVideoItem = ({ video, index, isActive, onClick, videoProgress, for
             </div>
           )}
 
-          {/* Completed badge */}
           {videoProgress.completed && (
             <div className="absolute top-1 right-1 bg-green-600 rounded-full p-0.5">
               <CheckCircle2 className="h-3 w-3 text-white" />
             </div>
           )}
 
-          {/* Active indicator */}
           {isActive && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded">
               <Play className="h-6 w-6 text-white fill-white" />
             </div>
           )}
 
-          {/* Duration badge */}
           <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded">
             {formatTime(video.duration_seconds)}
           </div>
@@ -200,7 +209,6 @@ const Player = () => {
   const [originalVideos, setOriginalVideos] = useState<any[]>([]);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [progress, setProgress] = useState<any[]>([]);
-  const [showNotesDialog, setShowNotesDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [autoPlay, setAutoPlay] = useState(true);
@@ -213,6 +221,18 @@ const Player = () => {
   const [ytPlayerReady, setYtPlayerReady] = useState(false);
   const [videoProgressPercentage, setVideoProgressPercentage] = useState(0);
   
+  // NEW: Playback speed
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  
+  // NEW: Theater mode
+  const [theaterMode, setTheaterMode] = useState(false);
+  
+  // NEW: Focus mode
+  const [focusMode, setFocusMode] = useState(false);
+  
+  // NEW: Copy link state
+  const [linkCopied, setLinkCopied] = useState(false);
+  
   // Quick Notes
   const [showQuickNotes, setShowQuickNotes] = useState(false);
   const [quickNoteText, setQuickNoteText] = useState("");
@@ -223,28 +243,21 @@ const Player = () => {
     timestamp: string;
   }>>([]);
   
-  // Break Reminders
   const [breakReminderEnabled, setBreakReminderEnabled] = useState(false);
   const [breakInterval, setBreakInterval] = useState(45);
   const [showBreakDialog, setShowBreakDialog] = useState(false);
   const [studyTimeElapsed, setStudyTimeElapsed] = useState(0);
   const [showBreakSettings, setShowBreakSettings] = useState(false);
   
-  // Shuffle Mode
   const [isShuffled, setIsShuffled] = useState(false);
-  
-  // Keyboard Shortcuts
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
-  
-  // Dialogs
+  const [showNotesDialog, setShowNotesDialog] = useState(false);
   const [showAddVideoDialog, setShowAddVideoDialog] = useState(false);
   const [isCustomPlaylist, setIsCustomPlaylist] = useState(false);
   
-  // Stats
   const [completedCount, setCompletedCount] = useState(0);
   const [totalWatchTime, setTotalWatchTime] = useState(0);
 
-  // Drag and drop sensors
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -252,7 +265,6 @@ const Player = () => {
     })
   );
 
-  // Load YouTube IFrame API
   useEffect(() => {
     const loadYouTubeAPI = () => {
       if (window.YT && window.YT.Player) {
@@ -283,12 +295,11 @@ const Player = () => {
     if (ytPlayerReady && videos.length > 0 && currentVideoIndex >= 0) {
       const timer = setTimeout(() => {
         initializePlayer();
-      }, 100);
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [ytPlayerReady, currentVideoIndex, videos]);
 
-  // Update current time every second
   useEffect(() => {
     const interval = setInterval(() => {
       if (playerRef.current && playerRef.current.getCurrentTime) {
@@ -296,13 +307,12 @@ const Player = () => {
           const time = playerRef.current.getCurrentTime();
           setCurrentTime(time);
           
-          // Update video progress percentage for live progress bar
           if (duration > 0) {
             const percentage = (time / duration) * 100;
             setVideoProgressPercentage(percentage);
           }
         } catch (e) {
-          // Player not ready yet
+          // Player not ready
         }
       }
     }, 1000);
@@ -310,7 +320,6 @@ const Player = () => {
     return () => clearInterval(interval);
   }, [duration]);
 
-  // Auto-save progress every 5 seconds
   useEffect(() => {
     progressIntervalRef.current = setInterval(() => {
       if (currentTime > 5 && isPlaying) {
@@ -325,7 +334,6 @@ const Player = () => {
     };
   }, [currentTime, currentVideoIndex, isPlaying]);
 
-  // Update playlist progress bar every 15 seconds
   useEffect(() => {
     videoProgressUpdateRef.current = setInterval(() => {
       if (currentTime > 0 && isPlaying) {
@@ -340,7 +348,6 @@ const Player = () => {
     };
   }, [currentTime, isPlaying, progress, videos]);
 
-  // Study time tracker for break reminders
   useEffect(() => {
     if (!breakReminderEnabled) return;
 
@@ -360,7 +367,6 @@ const Player = () => {
     return () => clearInterval(studyInterval);
   }, [isPlaying, breakReminderEnabled, breakInterval]);
 
-  // Total watch time tracker
   useEffect(() => {
     const watchInterval = setInterval(() => {
       if (isPlaying) {
@@ -371,7 +377,6 @@ const Player = () => {
     return () => clearInterval(watchInterval);
   }, [isPlaying]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -399,17 +404,28 @@ const Player = () => {
         case 'q':
           setShowQuickNotes(!showQuickNotes);
           break;
+        case 't':
+          toggleTheaterMode();
+          break;
+        case 'f':
+          toggleFocusMode();
+          break;
         case '?':
           setShowKeyboardHelp(true);
+          break;
+        case 'arrowright':
+          skipForward();
+          break;
+        case 'arrowleft':
+          skipBackward();
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [currentTime, isPlaying, showQuickNotes]);
+  }, [currentTime, isPlaying, showQuickNotes, theaterMode, focusMode]);
 
-  // Resizable sidebar
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
@@ -473,6 +489,11 @@ const Player = () => {
     try {
       setDuration(event.target.getDuration());
       
+      // Set initial playback speed
+      if (playbackSpeed !== 1) {
+        event.target.setPlaybackRate(playbackSpeed);
+      }
+      
       const currentProgress = progress.find(
         p => p.video_id === videos[currentVideoIndex]?.id
       );
@@ -481,6 +502,8 @@ const Player = () => {
         event.target.seekTo(currentProgress.watch_time_seconds);
         toast.info(`Resuming from ${formatTime(currentProgress.watch_time_seconds)}`);
       }
+      
+      event.target.playVideo();
     } catch (error) {
       console.error('Error in onPlayerReady:', error);
     }
@@ -506,6 +529,85 @@ const Player = () => {
     } else if (currentVideoIndex >= videos.length - 1) {
       toast.success('Playlist completed! 🎉');
     }
+  };
+
+  // NEW: Playback speed control
+  const changePlaybackSpeed = (speed: number) => {
+    if (playerRef.current && playerRef.current.setPlaybackRate) {
+      playerRef.current.setPlaybackRate(speed);
+      setPlaybackSpeed(speed);
+      toast.success(`Speed: ${speed}x`);
+    }
+  };
+
+  // NEW: Skip forward/backward
+  const skipForward = () => {
+    if (playerRef.current && playerRef.current.getCurrentTime) {
+      const newTime = playerRef.current.getCurrentTime() + 10;
+      playerRef.current.seekTo(newTime);
+      toast.info('+10 seconds');
+    }
+  };
+
+  const skipBackward = () => {
+    if (playerRef.current && playerRef.current.getCurrentTime) {
+      const newTime = Math.max(0, playerRef.current.getCurrentTime() - 10);
+      playerRef.current.seekTo(newTime);
+      toast.info('-10 seconds');
+    }
+  };
+
+  // NEW: Theater mode
+  const toggleTheaterMode = () => {
+    setTheaterMode(!theaterMode);
+    toast.success(theaterMode ? 'Theater mode OFF' : 'Theater mode ON');
+  };
+
+  // NEW: Focus mode
+  const toggleFocusMode = () => {
+    setFocusMode(!focusMode);
+    setSidebarCollapsed(!focusMode);
+    toast.success(focusMode ? 'Focus mode OFF' : 'Focus mode ON');
+  };
+
+  // NEW: Copy video URL with timestamp
+  const copyVideoLinkWithTimestamp = () => {
+    const videoId = videos[currentVideoIndex].youtube_video_id;
+    const timestamp = Math.floor(currentTime);
+    const url = `https://www.youtube.com/watch?v=${videoId}&t=${timestamp}s`;
+    navigator.clipboard.writeText(url);
+    setLinkCopied(true);
+    toast.success('Link copied with timestamp!');
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
+  // NEW: Jump to note timestamp
+  const jumpToNoteTimestamp = (time: number) => {
+    if (playerRef.current) {
+      playerRef.current.seekTo(time);
+      toast.info(`Jumped to ${formatTime(time)}`);
+    }
+  };
+
+  // NEW: Picture in Picture
+  const enablePiP = async () => {
+    try {
+      const iframe = document.querySelector('#youtube-player') as HTMLIFrameElement;
+      if (iframe && document.pictureInPictureEnabled) {
+        // @ts-ignore
+        await iframe.requestPictureInPicture();
+        toast.success('Picture-in-Picture enabled');
+      }
+    } catch (error) {
+      toast.error('PiP not supported');
+    }
+  };
+
+  // NEW: Calculate time remaining
+  const calculateTimeRemaining = () => {
+    const unwatchedVideos = videos.slice(currentVideoIndex + 1);
+    const remainingSeconds = unwatchedVideos.reduce((acc, video) => acc + video.duration_seconds, 0);
+    return formatTime(remainingSeconds);
   };
 
   const toggleAutoPlay = () => {
@@ -542,7 +644,6 @@ const Player = () => {
   };
 
   const updatePlaylistProgressBar = () => {
-    // Force re-calculation of completed count
     const completed = progress.filter(p => p.is_completed).length;
     setCompletedCount(completed);
   };
@@ -564,16 +665,17 @@ const Player = () => {
   };
 
   const addQuickNote = async () => {
-    if (!quickNoteText.trim() || !playerRef.current || !currentVideo) return;
+    if (!quickNoteText.trim() || !playerRef.current || !videos[currentVideoIndex]) return;
     
     const currentTime = Math.floor(playerRef.current.getCurrentTime());
+    const currentVideo = videos[currentVideoIndex];
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       const { data, error } = await supabase
-        .from("video_notes" as any)
+        .from("video_notes")
         .insert({
           user_id: user.id,
           video_id: currentVideo.id,
@@ -582,7 +684,7 @@ const Player = () => {
           timestamp_seconds: currentTime,
         })
         .select()
-        .single() as any;
+        .single();
 
       if (error) throw error;
 
@@ -605,9 +707,9 @@ const Player = () => {
   const deleteQuickNote = async (noteId: string) => {
     try {
       const { error } = await supabase
-        .from("video_notes" as any)
+        .from("video_notes")
         .delete()
-        .eq("id", noteId) as any;
+        .eq("id", noteId);
 
       if (error) throw error;
 
@@ -627,34 +729,33 @@ const Player = () => {
         return;
       }
 
-      const { data: playlistData, error: playlistError } = await (supabase
-        .from("playlists" as any)
+      const { data: playlistData, error: playlistError } = await supabase
+        .from("playlists")
         .select("*")
         .eq("id", playlistId)
         .eq("user_id", user.id)
-        .single() as any);
+        .single();
 
       if (playlistError) throw playlistError;
       setPlaylist(playlistData);
       
-      // Check if it's a custom playlist
       setIsCustomPlaylist(playlistData?.youtube_playlist_id?.startsWith('custom_') || false);
 
-      const { data: videosData, error: videosError } = await (supabase
-        .from("videos" as any)
+      const { data: videosData, error: videosError } = await supabase
+        .from("videos")
         .select("*")
         .eq("playlist_id", playlistId)
-        .order("position_order", { ascending: true }) as any);
+        .order("position_order", { ascending: true });
 
       if (videosError) throw videosError;
       setVideos(videosData || []);
       setOriginalVideos(videosData || []);
 
-      const { data: progressData } = await (supabase
-        .from("video_progress" as any)
+      const { data: progressData } = await supabase
+        .from("video_progress")
         .select("*")
         .eq("user_id", user.id)
-        .eq("playlist_id", playlistId) as any);
+        .eq("playlist_id", playlistId);
 
       setProgress(progressData || []);
       setCompletedCount(progressData?.filter((p: any) => p.is_completed).length || 0);
@@ -666,21 +767,11 @@ const Player = () => {
         const videoIndex = videosData?.findIndex((v: any) => v.id === lastWatched.video_id) || 0;
         setCurrentVideoIndex(Math.max(0, videoIndex));
       }
-      
-      // Set first video as current if available
-      if (videosData && videosData.length > 0 && currentVideoIndex === 0) {
-        // Force player to load the video after it's ready
-        setTimeout(() => {
-          if (playerRef.current && videosData[currentVideoIndex]) {
-            playerRef.current.loadVideoById(videosData[currentVideoIndex].youtube_video_id);
-          }
-        }, 500);
-      }
 
-      await (supabase
-        .from("playlists" as any)
+      await supabase
+        .from("playlists")
         .update({ last_accessed_at: new Date().toISOString() })
-        .eq("id", playlistId) as any);
+        .eq("id", playlistId);
 
     } catch (error) {
       console.error("Error loading playlist:", error);
@@ -702,15 +793,14 @@ const Player = () => {
       );
 
       if (existingProgress) {
-        await (supabase
-          .from("video_progress" as any)
+        await supabase
+          .from("video_progress")
           .update({
             watch_time_seconds: Math.floor(time),
             last_watched_at: new Date().toISOString(),
           })
-          .eq("id", existingProgress.id) as any);
+          .eq("id", existingProgress.id);
 
-        // Update local progress state
         const updatedProgress = progress.map((p: any) =>
           p.video_id === videos[currentVideoIndex].id
             ? { ...p, watch_time_seconds: Math.floor(time) }
@@ -767,7 +857,6 @@ const Player = () => {
           })
           .eq("id", existingProgress.id);
 
-        // Update local state immediately
         const updatedProgress = progress.map(p =>
           p.video_id === videos[currentVideoIndex].id
             ? { ...p, is_completed: newCompletedState }
@@ -886,6 +975,23 @@ const Player = () => {
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
+      {/* Focus Mode Overlay */}
+      {focusMode && (
+        <div className="fixed inset-0 bg-black/90 z-40 flex items-center justify-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-4 text-white hover:bg-white/10"
+            onClick={toggleFocusMode}
+          >
+            <X className="h-6 w-6" />
+          </Button>
+          <div className="w-full max-w-6xl aspect-video">
+            <div id="youtube-player" className="w-full h-full" />
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="border-b bg-card px-4 py-2 flex items-center gap-3 flex-shrink-0 z-50">
         <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
@@ -895,10 +1001,44 @@ const Player = () => {
           <p className="text-sm font-medium truncate">{playlist.title}</p>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span>{completedCount}/{videos.length} completed</span>
+            <span>•</span>
             <span>{formatTime(totalWatchTime)} today</span>
+            {/* NEW: Time remaining */}
+            {currentVideoIndex < videos.length - 1 && (
+              <>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {calculateTimeRemaining()} left
+                </span>
+              </>
+            )}
           </div>
         </div>
         
+        {isCustomPlaylist && (
+          <Button variant="outline" size="sm" onClick={() => setShowAddVideoDialog(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Video
+          </Button>
+        )}
+        
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant={focusMode ? "default" : "outline"} 
+                size="sm" 
+                onClick={toggleFocusMode}
+              >
+                <Focus className="h-4 w-4 mr-1" />
+                Focus
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Toggle focus mode (F)</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
         <Button variant="outline" size="sm" onClick={() => {
           saveProgress(currentTime, true);
           updatePlaylistProgressBar();
@@ -914,12 +1054,42 @@ const Player = () => {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Video Section */}
-        <div className="flex-1 flex flex-col overflow-y-auto">
-          {/* Video Player with padding */}
+        <div className={`flex-1 flex flex-col overflow-y-auto transition-all ${
+          theaterMode ? 'max-w-none' : ''
+        }`}>
+          {/* Video Player */}
           <div className="px-6 pt-4">
-            <div className="relative w-full bg-black rounded-lg overflow-hidden" style={{ paddingTop: '56.25%' }}>
-              <div className="absolute inset-0">
-                <div id="youtube-player" className="w-full h-full" />
+            <div className={`relative w-full bg-black rounded-lg overflow-hidden ${
+              theaterMode ? 'aspect-[21/9]' : 'aspect-video'
+            }`}>
+              {!focusMode && <div id="youtube-player" className="w-full h-full" />}
+
+              {/* NEW: Mini progress indicator */}
+              <div className="absolute top-0 left-0 right-0 h-1 bg-black/50 z-50">
+                <div 
+                  className={`h-full ${progressColor} transition-all duration-500`}
+                  style={{ width: `${playlistProgress}%` }}
+                />
+              </div>
+
+              {/* NEW: Skip buttons overlay */}
+              <div className="absolute inset-0 flex items-center justify-between px-4 pointer-events-none z-40">
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="pointer-events-auto bg-black/60 hover:bg-black/80 text-white"
+                  onClick={skipBackward}
+                >
+                  <SkipBack className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="pointer-events-auto bg-black/60 hover:bg-black/80 text-white"
+                  onClick={skipForward}
+                >
+                  <SkipForward className="h-5 w-5" />
+                </Button>
               </div>
 
               <Button
@@ -947,8 +1117,9 @@ const Player = () => {
             <div className="flex items-start gap-4">
               <div className="flex-1 min-w-0">
                 <h1 className="text-lg font-semibold mb-1">{currentVideo.title}</h1>
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                   <span>{currentVideo.channel_name || 'Unknown Channel'}</span>
+                  <span>•</span>
                   <a
                     href={`https://www.youtube.com/watch?v=${currentVideo.youtube_video_id}`}
                     target="_blank"
@@ -957,11 +1128,48 @@ const Player = () => {
                   >
                     Watch on YouTube <ExternalLink className="h-3 w-3" />
                   </a>
+                  {/* NEW: Copy link with timestamp */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={copyVideoLinkWithTimestamp}
+                    className="h-auto p-0 hover:bg-transparent"
+                  >
+                    <span className="flex items-center gap-1 text-primary hover:underline">
+                      {linkCopied ? <CheckCheck className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                      Copy link @ {formatTime(currentTime)}
+                    </span>
+                  </Button>
                 </div>
               </div>
             </div>
 
-            {/* Enhanced Playlist Progress Bar */}
+            {/* NEW: Current video progress */}
+            <div className="space-y-2 bg-muted/30 p-4 rounded-lg">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground font-medium">Current Video Progress</span>
+                <span className={`font-bold ${
+                  videoProgressPercentage >= 80 ? 'text-green-600' :
+                  videoProgressPercentage >= 50 ? 'text-yellow-600' :
+                  videoProgressPercentage >= 20 ? 'text-orange-600' :
+                  'text-blue-600'
+                }`}>
+                  {Math.round(videoProgressPercentage)}%
+                </span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className={`h-full ${getProgressColor(videoProgressPercentage)} transition-all duration-300`}
+                  style={{ width: `${videoProgressPercentage}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{formatTime(currentTime)}</span>
+                <span>{formatTime(duration)}</span>
+              </div>
+            </div>
+
+            {/* Playlist Progress Bar */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground font-medium">Playlist Progress</span>
@@ -985,6 +1193,45 @@ const Player = () => {
                   style={{ width: `${playlistProgress}%` }}
                 />
               </div>
+
+              {/* NEW: Progress color legend */}
+              <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 bg-red-500 rounded-full" />
+                  <span>0-20%</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 bg-orange-500 rounded-full" />
+                  <span>20-50%</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 bg-yellow-500 rounded-full" />
+                  <span>50-80%</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 bg-green-500 rounded-full" />
+                  <span>80-100%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* NEW: Playback Speed Controls */}
+            <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+              <Gauge className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium mr-2">Playback Speed:</span>
+              <div className="flex gap-1">
+                {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((speed) => (
+                  <Button
+                    key={speed}
+                    variant={playbackSpeed === speed ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => changePlaybackSpeed(speed)}
+                    className="h-8 px-3"
+                  >
+                    {speed}x
+                  </Button>
+                ))}
+              </div>
             </div>
 
             {/* Action Buttons */}
@@ -993,7 +1240,6 @@ const Player = () => {
                 variant="outline" 
                 size="sm" 
                 onClick={handleMarkComplete}
-                className="pointer-events-auto cursor-pointer"
               >
                 {currentProgress.completed ? (
                   <>
@@ -1012,20 +1258,37 @@ const Player = () => {
                 variant="outline" 
                 size="sm" 
                 onClick={() => navigate(`/analytics/${playlistId}`)}
-                className="pointer-events-auto cursor-pointer"
               >
                 <BarChart3 className="h-4 w-4 mr-1" />
                 Analytics
               </Button>
 
               <Button
+                variant={theaterMode ? "default" : "outline"}
+                size="sm"
+                onClick={toggleTheaterMode}
+              >
+                <Maximize className="h-4 w-4 mr-1" />
+                Theater
+              </Button>
+
+              <Button
                 variant={isShuffled ? "default" : "outline"}
                 size="sm"
                 onClick={toggleShuffle}
-                className="pointer-events-auto cursor-pointer"
               >
                 <Shuffle className="h-4 w-4 mr-1" />
                 {isShuffled ? 'Shuffled' : 'Shuffle'}
+              </Button>
+
+              {/* NEW: Picture in Picture */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={enablePiP}
+              >
+                <PictureInPicture2 className="h-4 w-4 mr-1" />
+                PiP
               </Button>
 
               {isShuffled && (
@@ -1033,7 +1296,6 @@ const Player = () => {
                   variant="outline"
                   size="sm"
                   onClick={resetToOriginalOrder}
-                  className="pointer-events-auto cursor-pointer"
                 >
                   Reset Order
                 </Button>
@@ -1043,7 +1305,6 @@ const Player = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowKeyboardHelp(true)}
-                className="pointer-events-auto cursor-pointer"
               >
                 <Keyboard className="h-4 w-4 mr-1" />
                 Shortcuts
@@ -1053,7 +1314,6 @@ const Player = () => {
                 variant={breakReminderEnabled ? "default" : "outline"}
                 size="sm"
                 onClick={() => setShowBreakSettings(true)}
-                className="pointer-events-auto cursor-pointer"
               >
                 <Bell className="h-4 w-4 mr-1" />
                 Breaks
@@ -1067,7 +1327,6 @@ const Player = () => {
                 size="sm" 
                 onClick={handlePrevious} 
                 disabled={currentVideoIndex === 0}
-                className="pointer-events-auto cursor-pointer"
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Previous
@@ -1082,7 +1341,6 @@ const Player = () => {
                 size="sm" 
                 onClick={handleNext} 
                 disabled={currentVideoIndex === videos.length - 1}
-                className="pointer-events-auto cursor-pointer"
               >
                 Next
                 <ChevronRight className="h-4 w-4 ml-1" />
@@ -1094,7 +1352,6 @@ const Player = () => {
                 variant={autoPlay ? "default" : "outline"} 
                 size="sm" 
                 onClick={toggleAutoPlay}
-                className="pointer-events-auto cursor-pointer"
               >
                 <Play className="h-4 w-4 mr-1" />
                 Auto: {autoPlay ? 'ON' : 'OFF'}
@@ -1123,16 +1380,42 @@ const Player = () => {
                 onChange={(e) => setQuickNoteText(e.target.value)}
                 className="min-h-[150px]"
               />
-              <Button onClick={saveQuickNote} className="w-full">
+              <Button onClick={addQuickNote} className="w-full">
                 <Save className="h-4 w-4 mr-2" />
                 Save Note
               </Button>
               <p className="text-xs text-muted-foreground">At: {formatTime(currentTime)}</p>
             </div>
+
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {quickNotes.map((note) => (
+                <div key={note.id} className="bg-muted p-3 rounded-lg group">
+                  <div className="flex items-center justify-between mb-2">
+                    {/* NEW: Clickable timestamp */}
+                    <button
+                      onClick={() => jumpToNoteTimestamp(note.time)}
+                      className="text-xs text-primary hover:underline font-medium flex items-center gap-1"
+                    >
+                      <Clock className="h-3 w-3" />
+                      {note.timestamp}
+                    </button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => deleteQuickNote(note.id)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <p className="text-sm">{note.text}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Sidebar with Drag & Drop */}
+        {/* Sidebar with Videos */}
         {!sidebarCollapsed && !showQuickNotes && (
           <>
             <div
@@ -1211,11 +1494,11 @@ const Player = () => {
                       <button
                         key={video.id}
                         onClick={() => setCurrentVideoIndex(videos.findIndex(v => v.id === video.id))}
-                        className={`w-full p-3 flex gap-3 hover:bg-muted/50 transition border-b text-left ${
+                        className={`w-full p-3 flex gap-3 hover:bg-muted/50 transition border-b text-left group ${
                           isActive ? 'bg-primary/10 border-l-4 border-l-primary' : ''
                         }`}
                       >
-                        <div className="relative flex-shrink-0">
+                        <div className="relative flex-shrink-0 transform group-hover:scale-105 transition-transform">
                           <img
                             src={video.thumbnail_url}
                             alt={video.title}
@@ -1340,6 +1623,10 @@ const Player = () => {
             <div className="flex justify-between"><span>M</span><span>Mark complete</span></div>
             <div className="flex justify-between"><span>A</span><span>Toggle auto-play</span></div>
             <div className="flex justify-between"><span>Q</span><span>Quick notes</span></div>
+            <div className="flex justify-between"><span>T</span><span>Theater mode</span></div>
+            <div className="flex justify-between"><span>F</span><span>Focus mode</span></div>
+            <div className="flex justify-between"><span>→</span><span>Skip forward 10s</span></div>
+            <div className="flex justify-between"><span>←</span><span>Skip backward 10s</span></div>
             <div className="flex justify-between"><span>Ctrl+S</span><span>Save progress</span></div>
           </div>
         </DialogContent>
@@ -1353,6 +1640,15 @@ const Player = () => {
         youtubeVideoId={currentVideo.youtube_video_id}
         onNotesGenerated={loadPlaylistData}
       />
+
+      {isCustomPlaylist && (
+        <AddVideoToPlaylistDialog
+          open={showAddVideoDialog}
+          onOpenChange={setShowAddVideoDialog}
+          playlistId={playlistId!}
+          onVideoAdded={loadPlaylistData}
+        />
+      )}
     </div>
   );
 };
