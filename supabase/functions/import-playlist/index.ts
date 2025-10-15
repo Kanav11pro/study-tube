@@ -21,137 +21,13 @@ serve(async (req) => {
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) throw new Error('Unauthorized');
 
-    const { playlistId, videoId, customPlaylistName, isCustomPlaylist, addToExisting } = await req.json();
+    const { playlistId } = await req.json();
     const YOUTUBE_API_KEY = Deno.env.get('YOUTUBE_API_KEY');
     
     if (!YOUTUBE_API_KEY) {
       throw new Error('YouTube API key not configured');
     }
 
-    // Helper function to parse duration
-    const parseDuration = (duration: string): number => {
-      const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-      if (!match) return 0;
-      const hours = parseInt(match[1] || '0');
-      const minutes = parseInt(match[2] || '0');
-      const seconds = parseInt(match[3] || '0');
-      return hours * 3600 + minutes * 60 + seconds;
-    };
-
-    // ===== HANDLE SINGLE VIDEO (CREATE CUSTOM PLAYLIST) =====
-    if (isCustomPlaylist && videoId && customPlaylistName) {
-      console.log('Creating custom playlist with single video:', videoId);
-      
-      const videoResponse = await fetch(
-        `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoId}&key=${YOUTUBE_API_KEY}`
-      );
-      
-      if (!videoResponse.ok) {
-        throw new Error('Failed to fetch video details');
-      }
-      
-      const videoData = await videoResponse.json();
-      
-      if (!videoData.items || videoData.items.length === 0) {
-        throw new Error('Video not found');
-      }
-      
-      const video = videoData.items[0];
-      
-      // Create custom playlist
-      const { data: playlist, error: playlistError } = await supabaseClient
-        .from('playlists')
-        .insert({
-          user_id: user.id,
-          youtube_playlist_id: `custom_${Date.now()}`,
-          title: customPlaylistName,
-          description: 'Custom playlist',
-          channel_name: video.snippet.channelTitle,
-          thumbnail_url: video.snippet.thumbnails?.medium?.url || video.snippet.thumbnails?.default?.url,
-          total_videos: 1,
-        })
-        .select()
-        .single();
-        
-      if (playlistError) throw playlistError;
-      
-      // Insert video
-      const { error: videoError } = await supabaseClient
-        .from('videos')
-        .insert({
-          playlist_id: playlist.id,
-          youtube_video_id: videoId,
-          title: video.snippet.title,
-          thumbnail_url: video.snippet.thumbnails?.medium?.url || video.snippet.thumbnails?.default?.url,
-          position_order: 0,
-          duration_seconds: parseDuration(video.contentDetails.duration),
-        });
-        
-      if (videoError) throw videoError;
-      
-      console.log('Successfully created custom playlist with 1 video');
-      
-      return new Response(JSON.stringify({ success: true, playlist }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // ===== HANDLE ADD VIDEO TO EXISTING CUSTOM PLAYLIST =====
-    if (addToExisting && videoId && playlistId) {
-      console.log('Adding video to existing playlist:', playlistId);
-      
-      const videoResponse = await fetch(
-        `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoId}&key=${YOUTUBE_API_KEY}`
-      );
-      
-      if (!videoResponse.ok) {
-        throw new Error('Failed to fetch video details');
-      }
-      
-      const videoData = await videoResponse.json();
-      
-      if (!videoData.items || videoData.items.length === 0) {
-        throw new Error('Video not found');
-      }
-      
-      const video = videoData.items[0];
-      
-      // Get current video count
-      const { count } = await supabaseClient
-        .from('videos')
-        .select('*', { count: 'exact', head: true })
-        .eq('playlist_id', playlistId);
-      
-      // Insert video
-      const { error: videoError } = await supabaseClient
-        .from('videos')
-        .insert({
-          playlist_id: playlistId,
-          youtube_video_id: videoId,
-          title: video.snippet.title,
-          thumbnail_url: video.snippet.thumbnails?.medium?.url || video.snippet.thumbnails?.default?.url,
-          position_order: count || 0,
-          duration_seconds: parseDuration(video.contentDetails.duration),
-        });
-        
-      if (videoError) throw videoError;
-      
-      // Update playlist count
-      const { error: updateError } = await supabaseClient
-        .from('playlists')
-        .update({ total_videos: (count || 0) + 1 })
-        .eq('id', playlistId);
-        
-      if (updateError) throw updateError;
-      
-      console.log('Successfully added video to playlist');
-      
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // ===== HANDLE NORMAL PLAYLIST IMPORT =====
     console.log('Fetching playlist:', playlistId);
     
     // Fetch playlist details
@@ -201,6 +77,16 @@ serve(async (req) => {
     durationsData.items?.forEach((item: any) => {
       durationMap.set(item.id, item.contentDetails.duration);
     });
+    
+    // Convert ISO 8601 duration to seconds
+    const parseDuration = (duration: string): number => {
+      const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+      if (!match) return 0;
+      const hours = parseInt(match[1] || '0');
+      const minutes = parseInt(match[2] || '0');
+      const seconds = parseInt(match[3] || '0');
+      return hours * 3600 + minutes * 60 + seconds;
+    };
     
     // Insert playlist
     const { data: playlist, error: playlistError } = await supabaseClient
