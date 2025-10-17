@@ -216,11 +216,13 @@ const Player = () => {
   // Quick Notes
   const [showQuickNotes, setShowQuickNotes] = useState(false);
   const [quickNoteText, setQuickNoteText] = useState("");
+  const [quickNoteTags, setQuickNoteTags] = useState("");
   const [quickNotes, setQuickNotes] = useState<Array<{ 
     id: string;
     time: number; 
     text: string; 
     timestamp: string;
+    tags?: string;
   }>>([]);
   
   // Break Reminders
@@ -287,6 +289,13 @@ const Player = () => {
       return () => clearTimeout(timer);
     }
   }, [ytPlayerReady, currentVideoIndex, videos]);
+
+  // Load quick notes when video changes
+  useEffect(() => {
+    if (videos[currentVideoIndex]?.id) {
+      loadQuickNotes();
+    }
+  }, [videos, currentVideoIndex]);
 
   // Update current time every second
   useEffect(() => {
@@ -563,6 +572,37 @@ const Player = () => {
     toast.success('Enjoy your break! 🌟');
   };
 
+  const loadQuickNotes = async () => {
+    const video = videos[currentVideoIndex];
+    if (!video?.id) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("video_notes" as any)
+        .select("*")
+        .eq("video_id", video.id)
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }) as any;
+
+      if (error) throw error;
+
+      const notes = (data || []).map((note: any) => ({
+        id: note.id,
+        time: note.timestamp_seconds,
+        text: note.note_text,
+        timestamp: formatTime(note.timestamp_seconds),
+        tags: note.tags,
+      }));
+
+      setQuickNotes(notes);
+    } catch (error: any) {
+      console.error("Error loading notes:", error);
+    }
+  };
+
   const addQuickNote = async () => {
     if (!quickNoteText.trim() || !playerRef.current || !currentVideo) return;
     
@@ -580,6 +620,7 @@ const Player = () => {
           playlist_id: playlistId,
           note_text: quickNoteText,
           timestamp_seconds: currentTime,
+          tags: quickNoteTags || null,
         })
         .select()
         .single() as any;
@@ -591,10 +632,12 @@ const Player = () => {
         time: currentTime,
         text: quickNoteText,
         timestamp: formatTime(currentTime),
+        tags: quickNoteTags || undefined,
       };
 
       setQuickNotes(prev => [note, ...prev]);
       setQuickNoteText("");
+      setQuickNoteTags("");
       toast.success("Note saved successfully! 📝");
     } catch (error: any) {
       console.error("Error saving note:", error);
@@ -665,16 +708,6 @@ const Player = () => {
         );
         const videoIndex = videosData?.findIndex((v: any) => v.id === lastWatched.video_id) || 0;
         setCurrentVideoIndex(Math.max(0, videoIndex));
-      }
-      
-      // Set first video as current if available
-      if (videosData && videosData.length > 0 && currentVideoIndex === 0) {
-        // Force player to load the video after it's ready
-        setTimeout(() => {
-          if (playerRef.current && videosData[currentVideoIndex]) {
-            playerRef.current.loadVideoById(videosData[currentVideoIndex].youtube_video_id);
-          }
-        }, 500);
       }
 
       await (supabase
@@ -910,6 +943,13 @@ const Player = () => {
           <Sparkles className="h-4 w-4 mr-1" />
           AI Notes
         </Button>
+        
+        {isCustomPlaylist && (
+          <Button variant="outline" size="sm" onClick={() => setShowAddVideoDialog(true)}>
+            <Play className="h-4 w-4 mr-1" />
+            Add Video
+          </Button>
+        )}
       </header>
 
       <div className="flex-1 flex overflow-hidden">
@@ -1105,29 +1145,88 @@ const Player = () => {
 
         {/* Quick Notes Panel */}
         {showQuickNotes && (
-          <div className="w-80 border-l bg-card flex flex-col z-40">
+          <div className="w-96 border-l bg-card flex flex-col z-40">
             <div className="p-3 border-b flex items-center justify-between">
               <h3 className="font-semibold flex items-center gap-2">
                 <StickyNote className="h-4 w-4" />
-                Quick Notes
+                Quick Notes ({quickNotes.length})
               </h3>
               <Button variant="ghost" size="icon" onClick={() => setShowQuickNotes(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
 
-            <div className="p-3 space-y-2">
+            {/* Add Note Form */}
+            <div className="p-3 border-b space-y-2 bg-muted/30">
               <Textarea
                 placeholder="Type your notes here..."
                 value={quickNoteText}
                 onChange={(e) => setQuickNoteText(e.target.value)}
-                className="min-h-[150px]"
+                className="min-h-[100px]"
               />
-              <Button onClick={addQuickNote} className="w-full">
-                <Save className="h-4 w-4 mr-2" />
-                Save Note
-              </Button>
-              <p className="text-xs text-muted-foreground">At: {formatTime(currentTime)}</p>
+              <Input
+                placeholder="Tags (e.g., important, concept, formula)"
+                value={quickNoteTags}
+                onChange={(e) => setQuickNoteTags(e.target.value)}
+                className="text-sm"
+              />
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">At: {formatTime(currentTime)}</p>
+                <Button onClick={addQuickNote} size="sm" disabled={!quickNoteText.trim()}>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Note
+                </Button>
+              </div>
+            </div>
+
+            {/* Saved Notes List */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              {quickNotes.length === 0 ? (
+                <div className="text-center text-muted-foreground text-sm py-8">
+                  <StickyNote className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No notes yet</p>
+                  <p className="text-xs mt-1">Add notes at any timestamp</p>
+                </div>
+              ) : (
+                quickNotes.map((note) => (
+                  <div key={note.id} className="bg-muted/50 rounded-lg p-3 space-y-2 hover:bg-muted transition">
+                    <div className="flex items-start justify-between gap-2">
+                      <button
+                        onClick={() => {
+                          if (playerRef.current) {
+                            playerRef.current.seekTo(note.time);
+                            toast.info(`Jumped to ${note.timestamp}`);
+                          }
+                        }}
+                        className="text-xs font-mono text-primary hover:underline"
+                      >
+                        {note.timestamp}
+                      </button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => deleteQuickNote(note.id)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap">{note.text}</p>
+                    {note.tags && (
+                      <div className="flex flex-wrap gap-1">
+                        {note.tags.split(',').map((tag, idx) => (
+                          <span
+                            key={idx}
+                            className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full"
+                          >
+                            {tag.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -1353,6 +1452,15 @@ const Player = () => {
         youtubeVideoId={currentVideo.youtube_video_id}
         onNotesGenerated={loadPlaylistData}
       />
+
+      {isCustomPlaylist && (
+        <AddVideoToPlaylistDialog
+          open={showAddVideoDialog}
+          onOpenChange={setShowAddVideoDialog}
+          playlistId={playlistId!}
+          onVideoAdded={loadPlaylistData}
+        />
+      )}
     </div>
   );
 };

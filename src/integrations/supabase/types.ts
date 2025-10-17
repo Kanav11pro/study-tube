@@ -224,6 +224,7 @@ export type Database = {
           id: string
           note_text: string
           playlist_id: string
+          tags: string | null
           timestamp_seconds: number
           updated_at: string
           user_id: string
@@ -234,6 +235,7 @@ export type Database = {
           id?: string
           note_text: string
           playlist_id: string
+          tags?: string | null
           timestamp_seconds?: number
           updated_at?: string
           user_id: string
@@ -244,6 +246,7 @@ export type Database = {
           id?: string
           note_text?: string
           playlist_id?: string
+          tags?: string | null
           timestamp_seconds?: number
           updated_at?: string
           user_id?: string
