@@ -710,12 +710,15 @@ const Player = () => {
       setCompletedCount(progressData?.filter((p: any) => p.is_completed).length || 0);
 
       if (progressData && progressData.length > 0) {
-        const lastWatched = progressData.reduce((prev: any, current: any) => 
-          new Date(current.last_watched_at) > new Date(prev.last_watched_at) ? current : prev
-        );
-        const videoIndex = videosData?.findIndex((v: any) => v.id === lastWatched.video_id) || 0;
-        setCurrentVideoIndex(Math.max(0, videoIndex));
-      }
+  const lastWatched = progressData.reduce((prev: any, current: any) => 
+    new Date(current.last_watched_at) > new Date(prev.last_watched_at) ? current : prev
+  );
+  const videoIndex = videosData?.findIndex((v: any) => v.id === lastWatched.video_id);
+  setCurrentVideoIndex(videoIndex >= 0 ? videoIndex : 0);
+} else {
+  setCurrentVideoIndex(0);
+}
+
 
       await (supabase
         .from("playlists" as any)
