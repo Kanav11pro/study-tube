@@ -27,11 +27,14 @@ import {
   X,
   Zap,
   Award,
-  GripVertical
+  GripVertical,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { toast } from "sonner";
 import { GenerateNotesDialog } from "@/components/GenerateNotesDialog";
 import { AddVideoToPlaylistDialog } from "@/components/AddVideoToPlaylistDialog";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +42,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -245,6 +249,9 @@ const Player = () => {
   // Stats
   const [completedCount, setCompletedCount] = useState(0);
   const [totalWatchTime, setTotalWatchTime] = useState(0);
+  
+  // Video Description
+  const [showFullDescription, setShowFullDescription] = useState(false);
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -879,6 +886,71 @@ const Player = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const parseTimestampToSeconds = (timestamp: string): number => {
+    const parts = timestamp.split(':').map(Number);
+    if (parts.length === 2) {
+      // MM:SS
+      return parts[0] * 60 + parts[1];
+    } else if (parts.length === 3) {
+      // HH:MM:SS
+      return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    }
+    return 0;
+  };
+
+  const jumpToTimestamp = (timestamp: string) => {
+    if (!playerRef.current) return;
+    
+    const seconds = parseTimestampToSeconds(timestamp);
+    playerRef.current.seekTo(seconds);
+    toast.info(`Jumped to ${timestamp}`);
+  };
+
+  const renderDescriptionWithTimestamps = (description: string) => {
+    if (!description) return null;
+
+    const timestampRegex = /(\d{1,2}):(\d{2})(?::(\d{2}))?/g;
+    const parts: JSX.Element[] = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = timestampRegex.exec(description)) !== null) {
+      // Add text before timestamp
+      if (match.index > lastIndex) {
+        parts.push(
+          <span key={`text-${lastIndex}`}>
+            {description.substring(lastIndex, match.index)}
+          </span>
+        );
+      }
+
+      // Add clickable timestamp
+      const timestamp = match[0];
+      parts.push(
+        <button
+          key={`timestamp-${match.index}`}
+          onClick={() => jumpToTimestamp(timestamp)}
+          className="text-primary hover:underline font-medium cursor-pointer"
+        >
+          {timestamp}
+        </button>
+      );
+
+      lastIndex = match.index + timestamp.length;
+    }
+
+    // Add remaining text
+    if (lastIndex < description.length) {
+      parts.push(
+        <span key={`text-${lastIndex}`}>
+          {description.substring(lastIndex)}
+        </span>
+      );
+    }
+
+    return parts;
+  };
+
   const getProgressColor = (percentage: number) => {
     if (percentage >= 80) return 'bg-green-500';
     if (percentage >= 50) return 'bg-yellow-500';
@@ -1000,6 +1072,43 @@ const Player = () => {
                 </div>
               </div>
             </div>
+
+            {/* Video Description with Clickable Timestamps */}
+            {currentVideo.description && (
+              <Card className="border-muted">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold">Description</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className={cn(
+                    "text-sm whitespace-pre-wrap leading-relaxed",
+                    !showFullDescription && "line-clamp-3"
+                  )}>
+                    {renderDescriptionWithTimestamps(currentVideo.description)}
+                  </div>
+                  {currentVideo.description.length > 200 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowFullDescription(!showFullDescription)}
+                      className="w-full text-primary hover:text-primary/80"
+                    >
+                      {showFullDescription ? (
+                        <>
+                          <ChevronUp className="h-4 w-4 mr-1" />
+                          Show less
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-4 w-4 mr-1" />
+                          Show more
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Enhanced Playlist Progress Bar */}
             <div className="space-y-2">

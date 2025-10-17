@@ -65,17 +65,20 @@ serve(async (req) => {
       nextPageToken = videosData.nextPageToken || '';
     } while (nextPageToken);
     
-    // Get video durations
+    // Get video durations and descriptions
     const videoIds = allVideos.map(v => v.contentDetails.videoId).join(',');
-    const durationsResponse = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoIds}&key=${YOUTUBE_API_KEY}`
+    const videosDetailsResponse = await fetch(
+      `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&id=${videoIds}&key=${YOUTUBE_API_KEY}`
     );
     
-    const durationsData = await durationsResponse.json();
-    const durationMap = new Map();
+    const videosDetailsData = await videosDetailsResponse.json();
+    const videoDetailsMap = new Map();
     
-    durationsData.items?.forEach((item: any) => {
-      durationMap.set(item.id, item.contentDetails.duration);
+    videosDetailsData.items?.forEach((item: any) => {
+      videoDetailsMap.set(item.id, {
+        duration: item.contentDetails.duration,
+        description: item.snippet.description || '',
+      });
     });
     
     // Convert ISO 8601 duration to seconds
@@ -106,14 +109,18 @@ serve(async (req) => {
     if (playlistError) throw playlistError;
 
     // Insert videos
-    const videosToInsert = allVideos.map((video, index) => ({
-      playlist_id: playlist.id,
-      youtube_video_id: video.contentDetails.videoId,
-      title: video.snippet.title,
-      thumbnail_url: video.snippet.thumbnails?.medium?.url || video.snippet.thumbnails?.default?.url,
-      position_order: index,
-      duration_seconds: parseDuration(durationMap.get(video.contentDetails.videoId) || 'PT0S'),
-    }));
+    const videosToInsert = allVideos.map((video, index) => {
+      const videoDetails = videoDetailsMap.get(video.contentDetails.videoId);
+      return {
+        playlist_id: playlist.id,
+        youtube_video_id: video.contentDetails.videoId,
+        title: video.snippet.title,
+        description: videoDetails?.description || '',
+        thumbnail_url: video.snippet.thumbnails?.medium?.url || video.snippet.thumbnails?.default?.url,
+        position_order: index,
+        duration_seconds: parseDuration(videoDetails?.duration || 'PT0S'),
+      };
+    });
 
     const { error: videosError } = await supabaseClient
       .from('videos')

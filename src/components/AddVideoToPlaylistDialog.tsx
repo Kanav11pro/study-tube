@@ -46,28 +46,19 @@ export const AddVideoToPlaylistDialog = ({
     setIsAdding(true);
 
     try {
-      const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
-      
-      if (!YOUTUBE_API_KEY) {
-        throw new Error("YouTube API key not configured");
-      }
-
-      // Fetch video details
-      const response = await fetch(
-        `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoId}&key=${YOUTUBE_API_KEY}`
+      // Fetch video details via edge function
+      const { data: videoData, error: fetchError } = await supabase.functions.invoke(
+        "fetch-video-details",
+        {
+          body: { videoId },
+        }
       );
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch video details");
+      if (fetchError || !videoData?.success) {
+        throw new Error(fetchError?.message || "Failed to fetch video details");
       }
 
-      const data = await response.json();
-
-      if (!data.items || data.items.length === 0) {
-        throw new Error("Video not found");
-      }
-
-      const videoInfo = data.items[0];
+      const videoInfo = videoData.videoInfo;
 
       // Parse duration
       const parseDuration = (duration: string): number => {
@@ -90,6 +81,7 @@ export const AddVideoToPlaylistDialog = ({
         playlist_id: playlistId,
         youtube_video_id: videoId,
         title: videoInfo.snippet.title,
+        description: videoInfo.snippet.description || '',
         thumbnail_url:
           videoInfo.snippet.thumbnails?.medium?.url ||
           videoInfo.snippet.thumbnails?.default?.url,

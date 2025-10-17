@@ -132,6 +132,7 @@ export const AddPlaylistDialog = ({ open, onOpenChange, onPlaylistAdded }: AddPl
         playlist_id: playlist.id,
         youtube_video_id: detectedVideoId,
         title: videoInfo.snippet.title,
+        description: videoInfo.snippet.description || '',
         thumbnail_url:
           videoInfo.snippet.thumbnails?.medium?.url ||
           videoInfo.snippet.thumbnails?.default?.url,
