@@ -292,7 +292,7 @@ const Player = () => {
     if (ytPlayerReady && videos.length > 0 && currentVideoIndex >= 0) {
       const timer = setTimeout(() => {
         initializePlayer();
-      }, 100);
+      }, 400);
       return () => clearTimeout(timer);
     }
   }, [ytPlayerReady, currentVideoIndex, videos]);
