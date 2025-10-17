@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -24,7 +24,47 @@ export const PlaylistCard = ({ playlist, onDelete }: PlaylistCardProps) => {
   const navigate = useNavigate();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const completionPercentage = 0; // Will be calculated based on progress
+  const [completionPercentage, setCompletionPercentage] = useState(0);
+  const [totalVideos, setTotalVideos] = useState(0);
+  const [completedVideos, setCompletedVideos] = useState(0);
+
+  useEffect(() => {
+    loadProgress();
+  }, [playlist.id]);
+
+  const loadProgress = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get total videos count
+      const { count: videosCount } = await supabase
+        .from("videos")
+        .select("*", { count: 'exact', head: true })
+        .eq("playlist_id", playlist.id);
+
+      setTotalVideos(videosCount || 0);
+
+      // Get completed videos count
+      const { data: progressData } = await supabase
+        .from("video_progress")
+        .select("is_completed")
+        .eq("user_id", user.id)
+        .eq("playlist_id", playlist.id)
+        .eq("is_completed", true);
+
+      const completed = progressData?.length || 0;
+      setCompletedVideos(completed);
+
+      // Calculate percentage
+      if (videosCount && videosCount > 0) {
+        const percentage = Math.round((completed / videosCount) * 100);
+        setCompletionPercentage(percentage);
+      }
+    } catch (error) {
+      console.error("Error loading progress:", error);
+    }
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -60,20 +100,20 @@ export const PlaylistCard = ({ playlist, onDelete }: PlaylistCardProps) => {
 
   const handleDelete = async () => {
     try {
-      await (supabase
-        .from("video_progress" as any)
+      await supabase
+        .from("video_progress")
         .delete()
-        .eq("playlist_id", playlist.id) as any);
+        .eq("playlist_id", playlist.id);
 
-      await (supabase
-        .from("videos" as any)
+      await supabase
+        .from("videos")
         .delete()
-        .eq("playlist_id", playlist.id) as any);
+        .eq("playlist_id", playlist.id);
 
-      const { error } = await (supabase
-        .from("playlists" as any)
+      const { error } = await supabase
+        .from("playlists")
         .delete()
-        .eq("id", playlist.id) as any);
+        .eq("id", playlist.id);
 
       if (error) throw error;
 
@@ -140,15 +180,15 @@ export const PlaylistCard = ({ playlist, onDelete }: PlaylistCardProps) => {
                 <Button
                   variant="secondary"
                   size="icon"
-                  className="h-8 w-8 bg-white/90 backdrop-blur-sm hover:bg-white shadow-lg"
+                  className="h-9 w-9 bg-black/80 backdrop-blur-md hover:bg-black/90 shadow-xl border border-white/20"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <MoreVertical className="h-4 w-4" />
+                  <MoreVertical className="h-4 w-4 text-white" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem
-                  className="text-red-600 focus:text-red-600 cursor-pointer"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 cursor-pointer font-medium focus:text-red-700 focus:bg-red-50"
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowDeleteDialog(true);
@@ -180,7 +220,7 @@ export const PlaylistCard = ({ playlist, onDelete }: PlaylistCardProps) => {
           <div className="absolute bottom-3 right-3">
             <Badge variant="secondary" className="bg-black/70 text-white backdrop-blur-sm border-0">
               <PlayCircle className="h-3 w-3 mr-1" />
-              {playlist.total_videos} videos
+              {totalVideos} videos
             </Badge>
           </div>
         </div>
@@ -207,7 +247,7 @@ export const PlaylistCard = ({ playlist, onDelete }: PlaylistCardProps) => {
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground font-medium">Progress</span>
                 <span className={`font-bold ${getProgressTextColor()}`}>
-                  {completionPercentage}%
+                  {completionPercentage}% ({completedVideos}/{totalVideos})
                 </span>
               </div>
               <div className="relative">
