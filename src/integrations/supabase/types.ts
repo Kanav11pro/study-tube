@@ -14,7 +14,339 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_notes: {
+        Row: {
+          created_at: string | null
+          id: string
+          key_points: string[]
+          summary: string
+          user_id: string
+          video_id: string
+          video_title: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          key_points: string[]
+          summary: string
+          user_id: string
+          video_id: string
+          video_title: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          key_points?: string[]
+          summary?: string
+          user_id?: string
+          video_id?: string
+          video_title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_notes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_notes_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlists: {
+        Row: {
+          channel_name: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          last_accessed_at: string | null
+          thumbnail_url: string | null
+          title: string
+          total_videos: number
+          user_id: string
+          youtube_playlist_id: string
+        }
+        Insert: {
+          channel_name?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          last_accessed_at?: string | null
+          thumbnail_url?: string | null
+          title: string
+          total_videos?: number
+          user_id: string
+          youtube_playlist_id: string
+        }
+        Update: {
+          channel_name?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          last_accessed_at?: string | null
+          thumbnail_url?: string | null
+          title?: string
+          total_videos?: number
+          user_id?: string
+          youtube_playlist_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlists_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string
+          exam_type: Database["public"]["Enums"]["exam_type"]
+          full_name: string
+          id: string
+          profile_picture: string | null
+          target_year: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          exam_type: Database["public"]["Enums"]["exam_type"]
+          full_name: string
+          id: string
+          profile_picture?: string | null
+          target_year: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          exam_type?: Database["public"]["Enums"]["exam_type"]
+          full_name?: string
+          id?: string
+          profile_picture?: string | null
+          target_year?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      study_streaks: {
+        Row: {
+          created_at: string | null
+          id: string
+          study_date: string
+          user_id: string
+          videos_completed: number
+          watch_time_seconds: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          study_date: string
+          user_id: string
+          videos_completed?: number
+          watch_time_seconds?: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          study_date?: string
+          user_id?: string
+          videos_completed?: number
+          watch_time_seconds?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_streaks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_settings: {
+        Row: {
+          auto_complete_percentage: number
+          auto_play_next: boolean
+          created_at: string | null
+          daily_reminder_time: string | null
+          default_playback_speed: number
+          id: string
+          updated_at: string | null
+          user_id: string
+          weekly_progress_email: boolean
+        }
+        Insert: {
+          auto_complete_percentage?: number
+          auto_play_next?: boolean
+          created_at?: string | null
+          daily_reminder_time?: string | null
+          default_playback_speed?: number
+          id?: string
+          updated_at?: string | null
+          user_id: string
+          weekly_progress_email?: boolean
+        }
+        Update: {
+          auto_complete_percentage?: number
+          auto_play_next?: boolean
+          created_at?: string | null
+          daily_reminder_time?: string | null
+          default_playback_speed?: number
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+          weekly_progress_email?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_notes: {
+        Row: {
+          created_at: string
+          id: string
+          note_text: string
+          playlist_id: string
+          timestamp_seconds: number
+          updated_at: string
+          user_id: string
+          video_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note_text: string
+          playlist_id: string
+          timestamp_seconds?: number
+          updated_at?: string
+          user_id: string
+          video_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note_text?: string
+          playlist_id?: string
+          timestamp_seconds?: number
+          updated_at?: string
+          user_id?: string
+          video_id?: string
+        }
+        Relationships: []
+      }
+      video_progress: {
+        Row: {
+          id: string
+          is_completed: boolean
+          last_watched_at: string | null
+          notes_generated: boolean
+          playlist_id: string
+          user_id: string
+          video_id: string
+          watch_time_seconds: number
+        }
+        Insert: {
+          id?: string
+          is_completed?: boolean
+          last_watched_at?: string | null
+          notes_generated?: boolean
+          playlist_id: string
+          user_id: string
+          video_id: string
+          watch_time_seconds?: number
+        }
+        Update: {
+          id?: string
+          is_completed?: boolean
+          last_watched_at?: string | null
+          notes_generated?: boolean
+          playlist_id?: string
+          user_id?: string
+          video_id?: string
+          watch_time_seconds?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_progress_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_progress_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_progress_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      videos: {
+        Row: {
+          created_at: string | null
+          duration_seconds: number
+          id: string
+          playlist_id: string
+          position_order: number
+          thumbnail_url: string | null
+          title: string
+          youtube_video_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          duration_seconds: number
+          id?: string
+          playlist_id: string
+          position_order: number
+          thumbnail_url?: string | null
+          title: string
+          youtube_video_id: string
+        }
+        Update: {
+          created_at?: string | null
+          duration_seconds?: number
+          id?: string
+          playlist_id?: string
+          position_order?: number
+          thumbnail_url?: string | null
+          title?: string
+          youtube_video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "videos_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +355,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      exam_type: "JEE" | "NEET" | "Other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +482,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      exam_type: ["JEE", "NEET", "Other"],
+    },
   },
 } as const

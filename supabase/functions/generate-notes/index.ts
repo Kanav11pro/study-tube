@@ -32,6 +32,7 @@ serve(async (req) => {
 
     // Fetch transcript from YouTube
     let transcript = '';
+    let transcriptAvailable = false;
     try {
       const transcriptResponse = await fetch(
         `https://www.youtube.com/api/timedtext?lang=en&v=${youtubeVideoId}`
@@ -43,8 +44,13 @@ serve(async (req) => {
         transcript = transcriptText
           .replace(/<[^>]*>/g, ' ')
           .replace(/\s+/g, ' ')
-          .trim()
-          .substring(0, 15000); // Limit to 15k chars
+          .trim();
+        
+        // Only use transcript if it's substantial
+        if (transcript.length > 100) {
+          transcriptAvailable = true;
+          console.log(`Transcript fetched successfully: ${transcript.length} characters`);
+        }
       }
     } catch (e) {
       console.log('Could not fetch transcript, will use video title:', e);
@@ -52,8 +58,11 @@ serve(async (req) => {
 
     // If no transcript, use video title
     const contentToAnalyze = transcript || `Video title: ${videoTitle}`;
+    
+    // Use more powerful model for longer transcripts
+    const model = transcript.length > 10000 ? 'google/gemini-2.5-pro' : 'google/gemini-2.5-flash';
 
-    // Generate notes using Lovable AI
+    // Generate comprehensive notes using Lovable AI
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -61,15 +70,37 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: model,
         messages: [
           {
             role: 'system',
-            content: 'You are an AI study assistant. Generate concise notes for students. Respond ONLY with valid JSON in this exact format: {"summary": "2-3 sentence summary", "key_points": ["point 1", "point 2", "point 3", "point 4", "point 5"]}'
+            content: `You are an expert AI study assistant helping students create comprehensive, detailed study notes from educational videos. 
+
+Your notes should be:
+- Extensive and thorough, covering all major topics
+- Well-structured with clear sections
+- Include specific examples, formulas, and concepts mentioned
+- Written in a student-friendly, clear manner
+- Comprehensive enough that students can study from the notes alone
+
+Respond ONLY with valid JSON in this exact format:
+{
+  "summary": "A comprehensive 3-5 sentence overview of the entire video content, highlighting the main educational objectives and key themes covered",
+  "key_points": [
+    "Detailed point 1 with explanation and context",
+    "Detailed point 2 with formulas or specific details if applicable",
+    "Detailed point 3 with examples",
+    "...continue with 15-25 detailed points covering all major topics"
+  ]
+}
+
+Make the key_points array extensive (15-25 points minimum) to ensure students get thorough coverage of all content.`
           },
           {
             role: 'user',
-            content: `Create study notes from this educational content:\n\n${contentToAnalyze}\n\nProvide a 2-3 sentence summary and 5-8 key learning points.`
+            content: transcriptAvailable 
+              ? `Create comprehensive, detailed study notes from this educational video transcript. Extract ALL important concepts, formulas, examples, and explanations. The notes should be thorough enough for exam preparation:\n\n${contentToAnalyze}\n\nProvide a comprehensive summary and 15-25+ detailed key learning points covering ALL major topics discussed.`
+              : `Create study notes for this educational video: "${videoTitle}"\n\nBased on the video title, generate useful study points about this topic. Provide a comprehensive summary and 10-15 key learning points about this subject.`
           }
         ],
       }),

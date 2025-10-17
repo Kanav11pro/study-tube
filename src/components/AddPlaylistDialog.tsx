@@ -84,28 +84,19 @@ export const AddPlaylistDialog = ({ open, onOpenChange, onPlaylistAdded }: AddPl
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Unauthorized");
 
-      const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
-      
-      if (!YOUTUBE_API_KEY) {
-        throw new Error("YouTube API key not configured");
-      }
-
-      // Fetch video details
-      const response = await fetch(
-        `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${detectedVideoId}&key=${YOUTUBE_API_KEY}`
+      // Fetch video details via edge function
+      const { data: videoData, error: fetchError } = await supabase.functions.invoke(
+        "fetch-video-details",
+        {
+          body: { videoId: detectedVideoId },
+        }
       );
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch video details");
+      if (fetchError || !videoData?.success) {
+        throw new Error(fetchError?.message || "Failed to fetch video details");
       }
 
-      const data = await response.json();
-
-      if (!data.items || data.items.length === 0) {
-        throw new Error("Video not found");
-      }
-
-      const videoInfo = data.items[0];
+      const videoInfo = videoData.videoInfo;
 
       // Create custom playlist
       const { data: playlist, error: playlistError } = await (supabase

@@ -29,6 +29,11 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [playlists, setPlaylists] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    currentStreak: 0,
+    weekWatchTime: 0,
+    aiNotesCount: 0,
+  });
 
   useEffect(() => {
     checkUser();
@@ -60,10 +65,73 @@ const Dashboard = () => {
         .order("last_accessed_at", { ascending: false }) as any);
 
       setPlaylists(playlistsData || []);
+
+      // Calculate stats
+      await calculateStats(user.id);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const calculateStats = async (userId: string) => {
+    try {
+      // Calculate current streak
+      const { data: streakData } = await (supabase
+        .from("study_streaks" as any)
+        .select("study_date")
+        .eq("user_id", userId)
+        .order("study_date", { ascending: false }) as any);
+
+      let currentStreak = 0;
+      if (streakData && streakData.length > 0) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        for (let i = 0; i < streakData.length; i++) {
+          const streakDate = new Date(streakData[i].study_date);
+          streakDate.setHours(0, 0, 0, 0);
+          
+          const expectedDate = new Date(today);
+          expectedDate.setDate(expectedDate.getDate() - i);
+          expectedDate.setHours(0, 0, 0, 0);
+          
+          if (streakDate.getTime() === expectedDate.getTime()) {
+            currentStreak++;
+          } else {
+            break;
+          }
+        }
+      }
+
+      // Calculate week watch time (last 7 days)
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      
+      const { data: weekData } = await (supabase
+        .from("study_streaks" as any)
+        .select("watch_time_seconds")
+        .eq("user_id", userId)
+        .gte("study_date", weekAgo.toISOString().split('T')[0]) as any);
+
+      const weekWatchTime = weekData
+        ? Math.round(weekData.reduce((sum: number, day: any) => sum + (day.watch_time_seconds || 0), 0) / 3600)
+        : 0;
+
+      // Count AI notes
+      const { count: aiNotesCount } = await (supabase
+        .from("ai_notes" as any)
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId) as any);
+
+      setStats({
+        currentStreak,
+        weekWatchTime,
+        aiNotesCount: aiNotesCount || 0,
+      });
+    } catch (error) {
+      console.error("Error calculating stats:", error);
     }
   };
 
@@ -210,14 +278,14 @@ const Dashboard = () => {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatsCard
             title="Current Streak"
-            value="0"
+            value={stats.currentStreak.toString()}
             unit="days"
             icon={Flame}
             variant="success"
           />
           <StatsCard
             title="Week Watch Time"
-            value="0"
+            value={stats.weekWatchTime.toString()}
             unit="hours"
             icon={Clock}
             variant="primary"
@@ -230,7 +298,7 @@ const Dashboard = () => {
           />
           <StatsCard
             title="AI Notes"
-            value="0"
+            value={stats.aiNotesCount.toString()}
             icon={Sparkles}
             variant="accent"
           />

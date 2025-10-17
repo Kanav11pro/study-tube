@@ -1123,7 +1123,7 @@ const Player = () => {
                 onChange={(e) => setQuickNoteText(e.target.value)}
                 className="min-h-[150px]"
               />
-              <Button onClick={saveQuickNote} className="w-full">
+              <Button onClick={addQuickNote} className="w-full">
                 <Save className="h-4 w-4 mr-2" />
                 Save Note
               </Button>
