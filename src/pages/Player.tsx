@@ -288,11 +288,12 @@ const Player = () => {
     loadPlaylistData();
   }, [playlistId]);
 
+    // Initialize player when ready
   useEffect(() => {
-    if (ytPlayerReady && videos.length > 0 && currentVideoIndex >= 0) {
+    if (ytPlayerReady && videos.length > 0 && currentVideoIndex >= 0 && videos[currentVideoIndex]) {
       const timer = setTimeout(() => {
         initializePlayer();
-      }, 400);
+      }, 500);
       return () => clearTimeout(timer);
     }
   }, [ytPlayerReady, currentVideoIndex, videos]);
@@ -304,41 +305,41 @@ const Player = () => {
     }
   }, [videos, currentVideoIndex]);
 
-  // Update current time every second
+  // Update current time every second - SAFE VERSION
   useEffect(() => {
     const interval = setInterval(() => {
-      if (playerRef.current && playerRef.current.getCurrentTime) {
+      if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
         try {
           const time = playerRef.current.getCurrentTime();
-          setCurrentTime(time);
+          const dur = playerRef.current.getDuration();
           
-          // Update video progress percentage for live progress bar
-          if (duration > 0) {
-            const percentage = (time / duration) * 100;
-            setVideoProgressPercentage(percentage);
+          if (typeof time === 'number' && !isNaN(time)) {
+            setCurrentTime(time);
+            
+            // Update video progress percentage for live progress bar
+            if (typeof dur === 'number' && dur > 0) {
+              const percentage = (time / dur) * 100;
+              setVideoProgressPercentage(percentage);
+            }
           }
         } catch (e) {
-          // Player not ready yet
+          // Player not ready yet, silently skip
         }
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [duration]);
+  }, []); // Empty deps - only create once
 
   // Auto-save progress every 5 seconds
   useEffect(() => {
-    progressIntervalRef.current = setInterval(() => {
+    const saveInterval = setInterval(() => {
       if (currentTime > 5 && isPlaying) {
         saveProgress(currentTime, false);
       }
     }, 5000);
 
-    return () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-    };
+    return () => clearInterval(saveInterval);
   }, [currentTime, currentVideoIndex, isPlaying]);
 
   // Update playlist progress bar every 15 seconds
