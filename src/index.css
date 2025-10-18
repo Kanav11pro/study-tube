@@ -136,10 +136,6 @@ All colors MUST be HSL.
   }
 }
 
-
-
-
-
 /* Hide all scrollbars globally */
 html {
   scrollbar-width: none;
@@ -160,3 +156,44 @@ html::-webkit-scrollbar {
   -ms-overflow-style: none;
 }
 
+/* ============================================
+   STUDYTUBE FOCUS MODE - Remove YouTube Distractions
+   ============================================ */
+
+/* Hide "More videos" overlay on pause */
+.ytp-pause-overlay,
+.ytp-scroll-min,
+.ytp-scroll-max {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Hide end screen suggestions */
+.ytp-endscreen-content,
+.ytp-ce-element,
+.ytp-ce-covering-overlay,
+.ytp-ce-element-shadow,
+.ytp-ce-covering-image {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Hide video annotations and info cards */
+.ytp-cards-teaser,
+.ytp-cards-teaser-box,
+.ytp-show-cards-title,
+.iv-card,
+.iv-branding {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Hide YouTube watermark */
+.ytp-watermark,
+.ytp-chrome-top-buttons .ytp-watermark {
+  display: none !important;
+  opacity: 0 !important;
+}
