@@ -466,20 +466,21 @@ const Player = () => {
     
     try {
       playerRef.current = new window.YT.Player('youtube-player', {
-        height: '100%',
-        width: '100%',
-        videoId: videoToPlay.youtube_video_id,
-        playerVars: {
-          autoplay: 1,
-          controls: 1,
-          rel: 0,
-          modestbranding: 1,
-        },
-        events: {
-          onReady: onPlayerReady,
-          onStateChange: onPlayerStateChange,
-        },
-      });
+  height: '100%',
+  width: '100%',
+  videoId: videoToPlay.youtube_video_id,
+  playerVars: {
+    autoplay: 1,
+    controls: 1,
+    rel: 0,
+    modestbranding: 1,
+    iv_load_policy: 3,    // NEW: Hide annotations/cards
+  },
+  events: {
+    onReady: onPlayerReady,
+    onStateChange: onPlayerStateChange,
+  },
+});
     } catch (error) {
       console.error('Error creating player:', error);
       toast.error('Failed to load video player');
