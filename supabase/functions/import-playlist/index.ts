@@ -33,7 +33,11 @@ serve(async (req) => {
     const YOUTUBE_API_KEY = Deno.env.get('YOUTUBE_API_KEY');
     
     if (!YOUTUBE_API_KEY) {
-      throw new Error('YouTube API key not configured');
+      console.error('YOUTUBE_API_KEY environment variable is not set');
+      return new Response(JSON.stringify({ error: 'Configuration error. Please contact support.' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     console.log('Fetching playlist:', playlistId);

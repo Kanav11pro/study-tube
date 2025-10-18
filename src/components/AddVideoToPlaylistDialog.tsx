@@ -55,7 +55,7 @@ export const AddVideoToPlaylistDialog = ({
       );
 
       if (fetchError || !videoData?.success) {
-        throw new Error(fetchError?.message || "Failed to fetch video details");
+        throw new Error(videoData?.error || fetchError?.message || "Failed to fetch video details");
       }
 
       const videoInfo = videoData.videoInfo;
