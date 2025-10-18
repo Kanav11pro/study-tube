@@ -1,10 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const inputSchema = z.object({
+  playlistId: z.string().trim().min(1).max(100),
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -21,7 +26,10 @@ serve(async (req) => {
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) throw new Error('Unauthorized');
 
-    const { playlistId } = await req.json();
+    const body = await req.json();
+    const validatedInput = inputSchema.parse(body);
+    const { playlistId } = validatedInput;
+    
     const YOUTUBE_API_KEY = Deno.env.get('YOUTUBE_API_KEY');
     
     if (!YOUTUBE_API_KEY) {
@@ -138,7 +146,13 @@ serve(async (req) => {
     });
   } catch (error: any) {
     console.error('Error importing playlist:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    
+    // Return generic error message to client, log details server-side
+    const userMessage = error instanceof z.ZodError 
+      ? 'Invalid playlist ID format'
+      : 'Unable to import playlist. Please try again.';
+    
+    return new Response(JSON.stringify({ error: userMessage }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
