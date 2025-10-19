@@ -30,6 +30,25 @@ const Auth = () => {
     password: "",
   });
 
+  const validatePassword = (password: string): string | null => {
+    if (password.length < 8) {
+      return "Password must be at least 8 characters";
+    }
+    if (!/[A-Z]/.test(password)) {
+      return "Password must contain at least one uppercase letter";
+    }
+    if (!/[a-z]/.test(password)) {
+      return "Password must contain at least one lowercase letter";
+    }
+    if (!/[0-9]/.test(password)) {
+      return "Password must contain at least one number";
+    }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+      return "Password must contain at least one special character";
+    }
+    return null;
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -38,8 +57,9 @@ const Auth = () => {
       return;
     }
 
-    if (signupData.password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    const passwordError = validatePassword(signupData.password);
+    if (passwordError) {
+      toast.error(passwordError);
       return;
     }
 
@@ -250,7 +270,7 @@ const Auth = () => {
                   <Input
                     id="signup-password"
                     type="password"
-                    placeholder="Minimum 6 characters"
+                    placeholder="Min 8 chars, 1 uppercase, 1 number, 1 special char"
                     value={signupData.password}
                     onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
                     disabled={isLoading}
