@@ -59,6 +59,27 @@ export type Database = {
           },
         ]
       }
+      platform_settings: {
+        Row: {
+          id: string
+          setting_key: string
+          setting_value: Json
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          setting_key: string
+          setting_value: Json
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       playlists: {
         Row: {
           channel_name: string | null
@@ -108,34 +129,103 @@ export type Database = {
       }
       profiles: {
         Row: {
+          ai_notes_reset_date: string | null
+          ai_notes_used_this_month: number | null
           created_at: string | null
           email: string
           exam_type: Database["public"]["Enums"]["exam_type"]
           full_name: string
           id: string
           profile_picture: string | null
+          referral_code: string | null
+          subscription_tier: string | null
           target_year: number
           updated_at: string | null
         }
         Insert: {
+          ai_notes_reset_date?: string | null
+          ai_notes_used_this_month?: number | null
           created_at?: string | null
           email: string
           exam_type: Database["public"]["Enums"]["exam_type"]
           full_name: string
           id: string
           profile_picture?: string | null
+          referral_code?: string | null
+          subscription_tier?: string | null
           target_year: number
           updated_at?: string | null
         }
         Update: {
+          ai_notes_reset_date?: string | null
+          ai_notes_used_this_month?: number | null
           created_at?: string | null
           email?: string
           exam_type?: Database["public"]["Enums"]["exam_type"]
           full_name?: string
           id?: string
           profile_picture?: string | null
+          referral_code?: string | null
+          subscription_tier?: string | null
           target_year?: number
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      referral_codes: {
+        Row: {
+          code: string
+          created_at: string | null
+          free_months_earned: number | null
+          id: string
+          referrals_count: number | null
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          free_months_earned?: number | null
+          id?: string
+          referrals_count?: number | null
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          free_months_earned?: number | null
+          id?: string
+          referrals_count?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      referral_signups: {
+        Row: {
+          created_at: string | null
+          granted_at: string | null
+          id: string
+          premium_granted: boolean | null
+          referral_code: string
+          referred_user_id: string
+          referrer_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          granted_at?: string | null
+          id?: string
+          premium_granted?: boolean | null
+          referral_code: string
+          referred_user_id: string
+          referrer_id: string
+        }
+        Update: {
+          created_at?: string | null
+          granted_at?: string | null
+          id?: string
+          premium_granted?: boolean | null
+          referral_code?: string
+          referred_user_id?: string
+          referrer_id?: string
         }
         Relationships: []
       }
@@ -173,6 +263,122 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      subscription_plans: {
+        Row: {
+          created_at: string | null
+          duration_days: number
+          features: Json | null
+          id: string
+          max_ai_notes_per_month: number
+          max_playlists: number | null
+          name: string
+          price_inr: number
+        }
+        Insert: {
+          created_at?: string | null
+          duration_days: number
+          features?: Json | null
+          id?: string
+          max_ai_notes_per_month: number
+          max_playlists?: number | null
+          name: string
+          price_inr: number
+        }
+        Update: {
+          created_at?: string | null
+          duration_days?: number
+          features?: Json | null
+          id?: string
+          max_ai_notes_per_month?: number
+          max_playlists?: number | null
+          name?: string
+          price_inr?: number
+        }
+        Relationships: []
+      }
+      subscription_requests: {
+        Row: {
+          admin_notes: string | null
+          amount_paid: number
+          created_at: string | null
+          email: string
+          full_name: string
+          id: string
+          payment_date: string
+          payment_screenshot_url: string
+          phone_number: string
+          plan_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          upi_transaction_id: string
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          amount_paid: number
+          created_at?: string | null
+          email: string
+          full_name: string
+          id?: string
+          payment_date: string
+          payment_screenshot_url: string
+          phone_number: string
+          plan_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          upi_transaction_id: string
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          amount_paid?: number
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          payment_date?: string
+          payment_screenshot_url?: string
+          phone_number?: string
+          plan_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          upi_transaction_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_requests_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
       }
       user_settings: {
         Row: {
@@ -214,6 +420,47 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_subscriptions: {
+        Row: {
+          auto_renew: boolean | null
+          created_at: string | null
+          end_date: string
+          id: string
+          plan_id: string
+          start_date: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          auto_renew?: boolean | null
+          created_at?: string | null
+          end_date: string
+          id?: string
+          plan_id: string
+          start_date: string
+          status: string
+          user_id: string
+        }
+        Update: {
+          auto_renew?: boolean | null
+          created_at?: string | null
+          end_date?: string
+          id?: string
+          plan_id?: string
+          start_date?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
             referencedColumns: ["id"]
           },
         ]
@@ -358,9 +605,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_referral_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
+      app_role: "admin" | "user"
       exam_type: "JEE" | "NEET" | "Other"
     }
     CompositeTypes: {
@@ -489,6 +747,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "user"],
       exam_type: ["JEE", "NEET", "Other"],
     },
   },

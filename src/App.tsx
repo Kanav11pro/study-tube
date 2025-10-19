@@ -12,6 +12,9 @@ import Settings from "./pages/Settings";
 import Notes from "./pages/Notes";
 import NotFound from "./pages/NotFound";
 import StudyTips from "@/pages/StudyTips";
+import Pricing from "@/pages/Pricing";
+import SubscriptionRequest from "@/pages/SubscriptionRequest";
+import Admin from "@/pages/Admin";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -29,6 +32,9 @@ const App = () => (
           <Route path="/settings" element={<Settings />} />
           <Route path="/notes" element={<Notes />} />
           <Route path="/tips" element={<StudyTips />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/subscription-request" element={<SubscriptionRequest />} />
+          <Route path="/admin" element={<Admin />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
