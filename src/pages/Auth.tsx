@@ -66,6 +66,10 @@ const Auth = () => {
     setIsLoading(true);
     
     try {
+      // Get referral code from URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const refCode = urlParams.get('ref');
+
       const { data, error } = await supabase.auth.signUp({
         email: signupData.email,
         password: signupData.password,
@@ -74,6 +78,7 @@ const Auth = () => {
             full_name: signupData.fullName,
             exam_type: signupData.examType,
             target_year: signupData.targetYear,
+            referral_code: refCode || undefined,
           },
           emailRedirectTo: `${window.location.origin}/`,
         },
@@ -82,7 +87,11 @@ const Auth = () => {
       if (error) throw error;
 
       if (data.user) {
-        toast.success("Account created successfully!");
+        if (refCode) {
+          toast.success("Account created! You've been granted 1 month Premium free! 🎉");
+        } else {
+          toast.success("Account created successfully!");
+        }
         navigate("/dashboard");
       }
     } catch (error: any) {

@@ -41,6 +41,23 @@ export const GenerateNotesDialog = ({
 
       if (error) throw error;
 
+      // Increment AI notes usage counter
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('ai_notes_used_this_month')
+          .eq('id', user.id)
+          .single();
+
+        await supabase
+          .from('profiles')
+          .update({ 
+            ai_notes_used_this_month: (profile?.ai_notes_used_this_month || 0) + 1 
+          })
+          .eq('id', user.id);
+      }
+
       setNotes(data.notes);
       toast.success("Notes generated successfully!");
       onNotesGenerated();
