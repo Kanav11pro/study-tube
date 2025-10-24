@@ -15,6 +15,7 @@ import StudyTips from "@/pages/StudyTips";
 import Pricing from "@/pages/Pricing";
 import SubscriptionRequest from "@/pages/SubscriptionRequest";
 import Admin from "@/pages/Admin";
+import { SubscriptionExpiryNotification } from "@/components/SubscriptionExpiryNotification";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -23,6 +24,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <SubscriptionExpiryNotification />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
