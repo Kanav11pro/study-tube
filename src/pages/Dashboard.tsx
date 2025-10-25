@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Flame, Clock, BookOpen, Sparkles, LogOut, FileText, TrendingUp, Target, Zap, User as UserIcon } from "lucide-react";
+import { Plus, Search, Flame, Clock, BookOpen, Sparkles, LogOut, FileText, TrendingUp, Target, Zap, User as UserIcon, MessageSquare } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { toast } from "sonner";
 import { StatsCard } from "@/components/StatsCard";
@@ -224,6 +224,10 @@ const Dashboard = () => {
                   <DropdownMenuItem onClick={() => navigate("/notes")} className="sm:hidden">
                     <FileText className="h-4 w-4 mr-2" />
                     Notes
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/doubts")}>
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Doubt History
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">

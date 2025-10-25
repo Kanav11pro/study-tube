@@ -34,6 +34,7 @@ import {
 import { toast } from "sonner";
 import { GenerateNotesDialog } from "@/components/GenerateNotesDialog";
 import { AddVideoToPlaylistDialog } from "@/components/AddVideoToPlaylistDialog";
+import { AIDoubtChat } from "@/components/AIDoubtChat";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -216,6 +217,8 @@ const Player = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [ytPlayerReady, setYtPlayerReady] = useState(false);
   const [videoProgressPercentage, setVideoProgressPercentage] = useState(0);
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [aiChatMaximized, setAiChatMaximized] = useState(false);
   
   // Quick Notes
   const [showQuickNotes, setShowQuickNotes] = useState(false);
@@ -1039,14 +1042,24 @@ const Player = () => {
                 <div id="youtube-player" className="w-full h-full" />
               </div>
 
-              <Button
-                variant="secondary"
-                size="icon"
-                className="absolute top-4 right-4 z-50"
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              >
-                {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-              </Button>
+              <div className="absolute top-4 right-4 z-50 flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  onClick={() => setShowAIChat(!showAIChat)}
+                  className={showAIChat ? 'bg-blue-600 text-white' : ''}
+                  title="AI Study Assistant"
+                >
+                  <Sparkles className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                >
+                  {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+                </Button>
+              </div>
 
               <Button
                 variant="secondary"
@@ -1345,7 +1358,7 @@ const Player = () => {
           </div>
         )}
 
-        {/* Sidebar with Drag & Drop */}
+        {/* Sidebar with Drag & Drop or AI Chat */}
         {!sidebarCollapsed && !showQuickNotes && (
           <>
             <div
@@ -1357,33 +1370,45 @@ const Player = () => {
               className="border-l bg-card flex flex-col overflow-hidden"
               style={{ width: `${sidebarWidth}px` }}
             >
-              <div className="p-3 border-b space-y-2">
-                <Input
-                  placeholder="Search videos..."
-                  value={sidebarSearch}
-                  onChange={(e) => setSidebarSearch(e.target.value)}
-                  className="h-9"
+              {showAIChat ? (
+                <AIDoubtChat
+                  videoId={currentVideo.id}
+                  playlistId={playlistId}
+                  videoTitle={currentVideo.title}
+                  videoTopic={playlist.title}
+                  currentTimestamp={Math.floor(currentTime)}
+                  onMaximize={() => setAiChatMaximized(!aiChatMaximized)}
+                  isMaximized={aiChatMaximized}
                 />
+              ) : (
+                <>
+                  <div className="p-3 border-b space-y-2">
+                    <Input
+                      placeholder="Search videos..."
+                      value={sidebarSearch}
+                      onChange={(e) => setSidebarSearch(e.target.value)}
+                      className="h-9"
+                    />
 
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-muted/50 rounded p-2">
-                    <div className="flex items-center gap-1 text-muted-foreground mb-1">
-                      <Zap className="h-3 w-3" />
-                      Streak
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-muted/50 rounded p-2">
+                        <div className="flex items-center gap-1 text-muted-foreground mb-1">
+                          <Zap className="h-3 w-3" />
+                          Streak
+                        </div>
+                        <div className="font-bold">5 days</div>
+                      </div>
+                      <div className="bg-muted/50 rounded p-2">
+                        <div className="flex items-center gap-1 text-muted-foreground mb-1">
+                          <Award className="h-3 w-3" />
+                          Progress
+                        </div>
+                        <div className="font-bold">{Math.round(playlistProgress)}%</div>
+                      </div>
                     </div>
-                    <div className="font-bold">5 days</div>
                   </div>
-                  <div className="bg-muted/50 rounded p-2">
-                    <div className="flex items-center gap-1 text-muted-foreground mb-1">
-                      <Award className="h-3 w-3" />
-                      Progress
-                    </div>
-                    <div className="font-bold">{Math.round(playlistProgress)}%</div>
-                  </div>
-                </div>
-              </div>
 
-              <div className="flex-1 overflow-y-auto">
+                  <div className="flex-1 overflow-y-auto">
                 {isShuffled ? (
                   <DndContext
                     sensors={sensors}
@@ -1486,7 +1511,9 @@ const Player = () => {
                     );
                   })
                 )}
-              </div>
+                  </div>
+                </>
+              )}
             </div>
           </>
         )}

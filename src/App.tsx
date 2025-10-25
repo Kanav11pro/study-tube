@@ -12,6 +12,7 @@ import Settings from "./pages/Settings";
 import Notes from "./pages/Notes";
 import NotFound from "./pages/NotFound";
 import StudyTips from "@/pages/StudyTips";
+import DoubtHistory from "@/pages/DoubtHistory";
 import Admin from "@/pages/Admin";
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/settings" element={<Settings />} />
           <Route path="/notes" element={<Notes />} />
           <Route path="/tips" element={<StudyTips />} />
+          <Route path="/doubts" element={<DoubtHistory />} />
           <Route path="/admin" element={<Admin />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

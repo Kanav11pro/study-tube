@@ -2,6 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Math Renderer Styles */
+.math-renderer {
+  font-family: 'Times New Roman', serif;
+}
+
+.math-renderer .fraction {
+  display: inline-block;
+  vertical-align: middle;
+  text-align: center;
+}
+
+.math-renderer .numerator {
+  display: block;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 1px;
+}
+
+.math-renderer .denominator {
+  display: block;
+  padding-top: 1px;
+}
+
+.math-renderer .sqrt {
+  position: relative;
+}
+
+.math-renderer .radicand {
+  border-top: 1px solid currentColor;
+  padding-left: 0.2em;
+}
+
+.math-renderer .integral,
+.math-renderer .summation {
+  font-size: 1.2em;
+  font-weight: bold;
+}
+
+.math-renderer .limit {
+  font-style: italic;
+}
+
+.math-renderer sup {
+  font-size: 0.7em;
+  vertical-align: super;
+}
+
+.math-renderer sub {
+  font-size: 0.7em;
+  vertical-align: sub;
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
