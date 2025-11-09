@@ -20,6 +20,19 @@ interface PlaylistCardProps {
   onDelete?: () => void;
 }
 
+// Helper: Always prefer best quality YouTube thumbnail
+function getHighQualityThumbnail(thumbnailUrl: string) {
+  if (!thumbnailUrl) return "";
+  if (thumbnailUrl.includes("img.youtube.com")) {
+    // Try sddefault (better quality) instead of default/hq/mq
+    return thumbnailUrl
+      .replace("/default.jpg", "/sddefault.jpg")
+      .replace("/mqdefault.jpg", "/sddefault.jpg")
+      .replace("/hqdefault.jpg", "/sddefault.jpg");
+  }
+  return thumbnailUrl;
+}
+
 export const PlaylistCard = ({ playlist, onDelete }: PlaylistCardProps) => {
   const navigate = useNavigate();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -141,9 +154,16 @@ export const PlaylistCard = ({ playlist, onDelete }: PlaylistCardProps) => {
           {playlist.thumbnail_url ? (
             <>
               <img
-                src={playlist.thumbnail_url}
+                src={getHighQualityThumbnail(playlist.thumbnail_url)}
                 alt={playlist.title}
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                onError={e => {
+                  // Fallback to hqdefault.jpg if sddefault.jpg fails (404)
+                  const target = e.target as HTMLImageElement;
+                  if (target.src.includes("sddefault.jpg")) {
+                    target.src = target.src.replace("sddefault.jpg", "hqdefault.jpg");
+                  }
+                }}
               />
               {/* Gradient Overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
